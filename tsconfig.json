@@ -1,0 +1,12 @@
+{
+  // Editor entry point only. Type checking runs per scope: `npm run typecheck`
+  // (core = game/ + shared/, client, server, node).
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.core.json" },
+    { "path": "./tsconfig.client.json" },
+    { "path": "./tsconfig.client-test.json" },
+    { "path": "./tsconfig.server.json" },
+    { "path": "./tsconfig.node.json" }
+  ]
+}

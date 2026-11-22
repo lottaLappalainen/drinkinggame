@@ -1,0 +1,10 @@
+{
+  // Worker + Durable Object (and their tests, which run inside workerd): Workers runtime
+  // types from `wrangler types`, plus Node types for nodejs_compat (node:crypto). No DOM.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024"],
+    "types": ["node", "@cloudflare/vitest-plugin/types"]
+  },
+  "include": ["worker-configuration.d.ts", "src/server/**/*", "test/server/**/*"]
+}

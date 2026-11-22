@@ -1,0 +1,37 @@
+# Claude working folder (design notes, local settings)
+.claude/
+
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Cloudflare / Wrangler local state and local secrets
+.wrangler/
+.dev.vars*
+
+# Environment / secrets
+# .env.staging is committed on purpose: it only selects the Cloudflare
+# environment (CLOUDFLARE_ENV=staging) and must never contain secrets.
+# There is deliberately no .env.production (production = top-level config).
+.env
+.env.local
+.env.*.local
+
+# Test output
+test-results/
+playwright-report/
+blob-report/
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

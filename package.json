@@ -1,0 +1,61 @@
+{
+  "name": "drinkinggame",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "engines": {
+    "node": ">=26 <27"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "npm run typecheck && npm run lint && npm test",
+    "deploy": "npm run check && vite build && wrangler deploy --durable-objects-code-update-mode immediate",
+    "deploy:staging": "npm run check && vite build --mode staging && wrangler deploy --durable-objects-code-update-mode immediate",
+    "cf-typegen": "wrangler types",
+    "typecheck": "tsc -p tsconfig.core.json && tsc -p tsconfig.client.json && tsc -p tsconfig.client-test.json && tsc -p tsconfig.server.json && tsc -p tsconfig.node.json",
+    "lint": "eslint . && stylelint \"src/**/*.css\" --allow-empty-input && prettier --check .",
+    "format": "prettier --write .",
+    "test": "node scripts/vitest.mjs run",
+    "test:watch": "node scripts/vitest.mjs",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@preact/signals": "2.11.4",
+    "preact": "10.29.8",
+    "valibot": "1.5.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "1.70.1",
+    "@cloudflare/vitest-plugin": "1.9.0",
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.1",
+    "@preact/preset-vite": "2.10.6",
+    "@types/node": "26.6.6",
+    "eslint": "10.15.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.14.0",
+    "prettier": "3.10.1",
+    "stylelint": "18.1.0",
+    "stylelint-config-standard": "41.1.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.73.0",
+    "vite": "8.3.8",
+    "vitest": "5.1.1",
+    "wrangler": "4.166.0"
+  },
+  "overrides": {
+    "wrangler": "$wrangler",
+    "miniflare": "5.20261119.0-beta",
+    "workerd": "1.20261119.1"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "workerd@1.20261119.1": true
+  }
+}

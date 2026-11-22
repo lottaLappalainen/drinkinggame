@@ -1,0 +1,14 @@
+{
+  // Browser app: DOM types, no Workers types. ES2023 lib = built-ins of the oldest supported
+  // browser (iOS Safari 16.4 / Chrome 111 — CLAUDE.md §2 "Browsers"); keep in sync with vite.config.ts.
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    // JSX only here: Preact's JSX types reference the DOM lib, so enabling JSX in the
+    // base config would leak browser types into game/ + shared/.
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  },
+  "include": ["src/client/**/*"]
+}

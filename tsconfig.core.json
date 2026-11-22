@@ -1,0 +1,12 @@
+{
+  // game/ + shared/: pure logic. ES2023 lib: this code also runs on phones (via shared/ and the
+  // client), so it may only use built-ins the oldest supported browser has (CLAUDE.md §2 "Browsers").
+  // No DOM and no Workers/Node types, so any browser or
+  // Cloudflare API used here is a compile error (CLAUDE.md §3).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023"],
+    "types": []
+  },
+  "include": ["src/game/**/*", "src/shared/**/*"]
+}

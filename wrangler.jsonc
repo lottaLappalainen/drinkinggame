@@ -1,0 +1,36 @@
+// Cloudflare Workers configuration. Production = this top-level config.
+// Staging = env.staging (selected at BUILD time via `vite build --mode staging`,
+// which loads .env.staging → CLOUDFLARE_ENV=staging). See CLAUDE.md §2.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "drinkinggame",
+  "main": "src/server/worker.ts",
+  "compatibility_date": "2026-11-15",
+  // nodejs_compat: synchronous hashing via node:crypto in the server (CLAUDE.md §4).
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "assets": {
+    // Join links like /g/ABCDE load the app; API and WebSocket paths always reach the Worker.
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/ws/*"],
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "GAME", "class_name": "GameObject" }],
+    // Immediate (not deferred) code updates — CLAUDE.md §2 "DO code updates". Set in config so every
+    // deploy path (scripts, manual `wrangler deploy`, rollback) uses it; the scripts' flag is a backstop.
+    "code_update_strategy": { "mode": "immediate" },
+  },
+  // The free plan requires SQLite-backed Durable Objects.
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameObject"] }],
+  "env": {
+    "staging": {
+      // Bindings are NOT inherited by environments — repeated here on purpose.
+      // Staging gets its own Worker (drinkinggame-staging) and its own DO namespace.
+      "durable_objects": {
+        "bindings": [{ "name": "GAME", "class_name": "GameObject" }],
+        "code_update_strategy": { "mode": "immediate" },
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["GameObject"] }],
+    },
+  },
+}

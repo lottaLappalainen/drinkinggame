@@ -1,0 +1,13 @@
+# Cloudflare static-asset headers.
+# Vite's hashed bundles never change content under the same name → cache forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# HTML (the app shell, also served for join links via the SPA fallback) must always be
+# revalidated, so a reload after a deploy gets the new bundle (OUTDATED_CLIENT, CLAUDE.md §6).
+/
+  Cache-Control: no-cache
+/index.html
+  Cache-Control: no-cache
+/g/*
+  Cache-Control: no-cache

@@ -1,0 +1,11 @@
+{
+  // Tooling configs, unit tests for game/ + shared/ + fixtures (run in Node), e2e tests and scripts.
+  // test/server and test/client have their own scopes (Workers types / DOM + JSX).
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024", "DOM"],
+    "types": ["node"]
+  },
+  "include": ["*.config.ts", "test/**/*", "e2e/**/*", "scripts/**/*"],
+  "exclude": ["test/server/**/*", "test/client/**/*"]
+}
