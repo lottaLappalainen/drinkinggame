@@ -21,9 +21,15 @@ export function App() {
     socket.addEventListener('message', (event: MessageEvent<string>) => {
       setReply(event.data);
     });
-    socket.addEventListener('close', () => setStatus('closed'));
-    socket.addEventListener('error', () => setStatus('error'));
-    return () => socket.close();
+    socket.addEventListener('close', () => {
+      setStatus('closed');
+    });
+    socket.addEventListener('error', () => {
+      setStatus('error');
+    });
+    return () => {
+      socket.close();
+    };
   }, []);
 
   return (

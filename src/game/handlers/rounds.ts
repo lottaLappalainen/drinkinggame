@@ -1,9 +1,16 @@
 // Round-side game logic — filled by Phase 3B (.claude/phases/phase-3-game-logic.md).
-// Stubs only in Phase 2: the signatures are the contract; the JSDoc names the rules to implement.
+// Still stubs (Phase 3B): start, submit, advance, end and closeRound. Already implemented (needed by
+// 3A, whose events reach them): onPlayersChanged (pause flag + early-end check) and the round-end
+// deadline routing — both end in closeRound, the 3B stub.
 //
 // Conventions: MUTATE `draft`, return effects. The engine has already checked sender identity,
 // host-only, phase and stale roundId.
+import { MIN_PLAYERS } from '../../shared/constants';
+import { canEndEarly, readyCounter } from '../../shared/ready';
+import { broadcast } from '../effects';
+import { keysOf } from '../ids';
 import { NotImplementedError } from '../notImplemented';
+import { activePlayers } from '../players/presence';
 import type { GameState } from '../stateSchema';
 import type { Ctx, Effect, EngineMessageOf, Sender } from '../types';
 
@@ -63,15 +70,50 @@ export function handleEnd(
 }
 
 /** Round-end deadline (endsAt + ANSWER_GRACE_MS): close the round, compute results once (S-1…S-7). */
-export function onRoundDeadlines(_draft: GameState, _ctx: Ctx): Effect[] {
-  throw new NotImplementedError(OWNER, 'round deadlines');
+export function onRoundDeadlines(draft: GameState, ctx: Ctx): Effect[] {
+  const due = draft.deadlines.roundEnd;
+  if (draft.phase !== 'QUESTION' || due === undefined || due > ctx.now) return [];
+  return closeRound(draft, ctx);
 }
 
 /**
  * Called by the engine after ANY change to who is online or active (including after a rebuild —
- * its effects are sent like any others). The ONLY place for: ending the round early (shared/ready canEndEarly, G-39),
- * and setting/clearing the pause flag (G-42, counting late joiners waiting for their first round).
+ * its effects are sent like any others). The ONLY place for: setting/clearing the pause flag
+ * (G-42, counting late joiners waiting for their first round) and ending the round early
+ * (shared/ready canEndEarly, G-39).
  */
-export function onPlayersChanged(_draft: GameState, _ctx: Ctx): Effect[] {
-  throw new NotImplementedError(OWNER, 'onPlayersChanged (G-39, G-42)');
+export function onPlayersChanged(draft: GameState, ctx: Ctx): Effect[] {
+  if (draft.phase !== 'QUESTION' && draft.phase !== 'RESULTS') return [];
+  const effects = updatePause(draft);
+  const round = draft.round;
+  if (draft.phase === 'QUESTION' && round !== null) {
+    const counter = readyCounter(
+      round.participants,
+      new Set(keysOf(round.answers)),
+      (id) => draft.players[id]?.connId != null,
+    );
+    if (canEndEarly(ctx.now, round.answerStartsAt, counter))
+      effects.push(...closeRound(draft, ctx));
+  }
+  return effects;
+}
+
+/**
+ * G-42: paused while fewer than MIN_PLAYERS are active (late joiners count — otherwise 2 players +
+ * 1 late joiner could never continue). The flag only blocks the host's Next; clearing it never
+ * starts anything by itself.
+ */
+function updatePause(draft: GameState): Effect[] {
+  const shouldPause = activePlayers(draft).length < MIN_PLAYERS;
+  if (shouldPause === draft.paused) return [];
+  draft.paused = shouldPause;
+  return [broadcast(shouldPause ? { type: 'paused', needed: MIN_PLAYERS } : { type: 'resumed' })];
+}
+
+/**
+ * QUESTION → RESULTS, exactly once: Borda scores, places, reveal steps, stats (S-1…S-7, G-50);
+ * sends roundResults. Phase 3B.
+ */
+function closeRound(_draft: GameState, _ctx: Ctx): Effect[] {
+  throw new NotImplementedError(OWNER, 'closeRound (S-1…S-7, G-50)');
 }

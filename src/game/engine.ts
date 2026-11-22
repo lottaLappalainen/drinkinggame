@@ -9,13 +9,8 @@
 // Mutation model: the engine deep-copies the state into a private `draft`, handlers mutate the
 // draft, and the engine compares before/after to report `changed` (the DO skips the storage
 // write when nothing changed, e.g. for timeSync or rejected messages).
-import type {
-  ClientMessageType,
-  ConnId,
-  ErrorCode,
-  Phase,
-  ServerMessage,
-} from '../shared/protocol';
+import type { ConnId, Phase } from '../shared/protocol';
+import { errorTo, send } from './effects';
 import * as players from './handlers/players';
 import * as rounds from './handlers/rounds';
 import type { GameState } from './stateSchema';
@@ -223,19 +218,6 @@ function playerSetKey(state: GameState): string {
     .map(([id, player]) => `${id}:${player.status}:${player.connId === null ? 0 : 1}`)
     .sort()
     .join('|');
-}
-
-function send(connId: ConnId, message: ServerMessage): Effect {
-  return { kind: 'send', connId, message };
-}
-
-/** An error reply naming the request it answers (`for`), so the phone knows what failed. */
-export function errorTo(
-  connId: ConnId,
-  code: Exclude<ErrorCode, 'NAME_TAKEN'>,
-  forType: ClientMessageType,
-): Effect {
-  return send(connId, { type: 'error', code, for: forType });
 }
 
 function assertNever(value: never): never {

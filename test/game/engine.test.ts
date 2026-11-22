@@ -7,7 +7,12 @@ import { NotImplementedError } from '../../src/game/notImplemented';
 import type { Ctx, EngineClientMessage, EngineEvent } from '../../src/game/types';
 import type { ClientMessageType, ConnId } from '../../src/shared/protocol';
 import { C, P, T0, connId } from '../fixtures/common';
-import { lobbyState, lobbyWithReclaimState, questionState } from '../fixtures/states';
+import {
+  fakeTokenHash,
+  lobbyState,
+  lobbyWithReclaimState,
+  questionState,
+} from '../fixtures/states';
 import { apply } from './helpers';
 
 const ctx: Ctx = { now: T0 + 20_000, random: () => 0.5 };
@@ -118,7 +123,7 @@ describe('late or repeated round actions are ignored silently (G-39)', () => {
   });
 });
 
-describe('routing reaches the right handler (stubs until Phase 3)', () => {
+describe('routing reaches the right handler', () => {
   const expectStub = (fn: () => unknown, owner: string) => {
     expect(fn).toThrow(NotImplementedError);
     expect(fn).toThrow(owner);
@@ -143,65 +148,23 @@ describe('routing reaches the right handler (stubs until Phase 3)', () => {
     );
   });
 
-  it('hello → players (3A)', () => {
-    expectStub(
-      () =>
-        applyEvent(
-          lobbyState(),
-          message(C.aino, { type: 'hello', protocolVersion: 1, tokenHash: 'f'.repeat(64) }),
-          ctx,
-        ),
-      'Phase 3A',
+  it('3A messages and events reach the players handlers (behaviour: test/game/players)', () => {
+    const hello = apply(
+      lobbyState(),
+      message(C.aino, { type: 'hello', protocolVersion: 1, tokenHash: fakeTokenHash(2) }),
+      ctx,
     );
+    expect(hello.effects.some((e) => e.kind === 'send' && e.message.type === 'welcome')).toBe(true);
+    const closed = apply(lobbyState(), { kind: 'connectionClosed', connId: C.aino }, ctx);
+    expect(closed.state.players[P.aino]?.connId).toBeNull();
+    const photo = apply(lobbyState(), { kind: 'photoStored', playerId: P.aino }, ctx);
+    expect(photo.state.players[P.aino]?.avatar.photoVersion).toBe(1);
   });
 
-  it('"That\'s me" from an anonymous connection → players (3A)', () => {
-    const state = lobbyState();
-    const anon = connId('conn-anon');
-    state.connections[anon] = { protocolVersion: 1 };
-    expectStub(
-      () =>
-        applyEvent(
-          state,
-          message(anon, {
-            type: 'reclaim',
-            playerId: P.sanna,
-            tokenHash: 'a'.repeat(64),
-            nickname: 'Sanna',
-            presetId: 'owl',
-          }),
-          ctx,
-        ),
-      'Phase 3A',
-    );
-  });
-
-  it('cancelReclaim from the requester → players (3A)', () => {
-    expectStub(
-      () =>
-        applyEvent(lobbyWithReclaimState(), message(C.requester, { type: 'cancelReclaim' }), ctx),
-      'Phase 3A',
-    );
-  });
-
-  it('connection, rebuild, photoStored and deadline events → handlers', () => {
-    const c = connId('c');
-    expectStub(
-      () =>
-        applyEvent(lobbyState(), { kind: 'connectionOpened', connId: c, protocolVersion: 1 }, ctx),
-      'connectionOpened',
-    );
-    expectStub(
-      () => applyEvent(lobbyState(), { kind: 'connectionClosed', connId: c }, ctx),
-      'connectionClosed',
-    );
-    // A rebuild is handled like any event (its effects are kept), not silently dropped.
-    expectStub(() => applyEvent(lobbyState(), { kind: 'rebuild', sockets: [] }, ctx), 'rebuild');
-    expectStub(
-      () => applyEvent(lobbyState(), { kind: 'photoStored', playerId: P.aino }, ctx),
-      'Phase 3A',
-    );
-    expectStub(() => applyEvent(lobbyState(), { kind: 'deadline' }, ctx), 'Phase 3B');
+  it('closing a round is still the 3B stub (reached via the round-end deadline)', () => {
+    const state = questionState();
+    const due = state.deadlines.roundEnd ?? 0;
+    expectStub(() => applyEvent(state, { kind: 'deadline' }, { ...ctx, now: due }), 'closeRound');
   });
 });
 

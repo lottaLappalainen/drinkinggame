@@ -126,6 +126,8 @@ describe('nickname cleaning — review fixes (Phase 2)', () => {
   it('the source files contain no literal invisible characters (they are written as escapes)', async () => {
     const { readFileSync } = await import('node:fs');
     const source = readFileSync('src/shared/nickname.ts', 'utf8');
+    // Code points (not graphemes) on purpose: each invisible character must be found on its own.
+    // eslint-disable-next-line @typescript-eslint/no-misused-spread
     const invisible = [...source].filter((c) => /[\p{Cf}]/u.test(c));
     expect(invisible.map((c) => c.codePointAt(0)?.toString(16))).toEqual([]);
   });

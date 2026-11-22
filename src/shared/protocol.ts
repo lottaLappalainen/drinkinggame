@@ -442,5 +442,4 @@ export type MessageOf<M extends { type: string }, T extends M['type']> = Extract
 
 // Compile-time check: CLIENT_MESSAGE_TYPES lists exactly the client message types.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
-const CLIENT_TYPES_COMPLETE: Same<(typeof CLIENT_MESSAGE_TYPES)[number], ClientMessageType> = true;
-void CLIENT_TYPES_COMPLETE;
+const _CLIENT_TYPES_COMPLETE: Same<(typeof CLIENT_MESSAGE_TYPES)[number], ClientMessageType> = true;

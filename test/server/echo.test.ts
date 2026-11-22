@@ -18,7 +18,9 @@ describe('WebSocket echo', () => {
   it('echoes a text message through the Durable Object', async () => {
     const socket = await openSocket('/ws/TEST1');
     const reply = new Promise<string>((resolve) => {
-      socket.addEventListener('message', (event) => resolve(String(event.data)));
+      socket.addEventListener('message', (event) => {
+        resolve(String(event.data));
+      });
     });
     socket.send('hello');
     expect(await reply).toBe('echo:hello');
