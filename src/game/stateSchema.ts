@@ -18,6 +18,7 @@ import {
   PresetIdSchema,
   RequestIdSchema,
   RoundIdSchema,
+  QuestionSchema,
   RoundResultsSchema,
   TimestampSchema,
   type ConnId,
@@ -25,6 +26,7 @@ import {
   type GameKey,
   type PlayerId,
 } from '../shared/protocol';
+import type { PresetId } from '../shared/avatars';
 
 /** SHA-256 of a phone-generated token, hex. Raw tokens are never stored. */
 export const TokenHashSchema = v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/));
@@ -77,7 +79,7 @@ export const ReclaimStateSchema = v.strictObject({
 
 export const RoundStateSchema = v.strictObject({
   roundId: RoundIdSchema,
-  /** Index into questionIds. */
+  /** Index into `questions`. */
   index: v.pipe(v.number(), v.integer(), v.minValue(0)),
   candidates: v.array(PlayerIdSchema),
   participants: v.array(PlayerIdSchema),
@@ -104,8 +106,12 @@ export const GameStateSchema = v.strictObject({
   players: v.record(PlayerIdSchema, PlayerStateSchema),
   connections: v.record(ConnIdSchema, ConnectionStateSchema),
   reclaims: v.record(RequestIdSchema, ReclaimStateSchema),
-  /** Drawn once at start, no repeats (G-31). */
-  questionIds: v.array(v.string()),
+  /**
+   * Drawn once at start, no repeats (G-31) — stored with their TEXT, so the running game never
+   * depends on the bank again: editing or removing questions and deploying mid-party is safe.
+   * (~4 KB for 35 questions.)
+   */
+  questions: v.array(QuestionSchema),
   round: v.nullable(RoundStateSchema),
   /** When the last identified player's socket closed; null while any player is online. */
   idleSince: v.nullable(TimestampSchema),
@@ -125,7 +131,7 @@ export type RoundState = v.InferOutput<typeof RoundStateSchema>;
 export type NewPlayerInput = {
   readonly nickname: string;
   readonly nameKey: string;
-  readonly presetId: string;
+  readonly presetId: PresetId;
   readonly tokenHash: string;
   readonly now: number;
   readonly activeFromRound: number;
@@ -170,7 +176,7 @@ export function createGame(input: CreateGameInput): GameState {
     players: { [input.hostId]: createPlayer({ ...input.host, activeFromRound: 1 }) },
     connections: {},
     reclaims: {},
-    questionIds: [],
+    questions: [],
     round: null,
     // Nobody connected yet: the lobby idles until the host's phone connects.
     idleSince: input.host.now,
@@ -200,7 +206,7 @@ export function createUpdatedEndState(input: {
     players: {},
     connections: {},
     reclaims: {},
-    questionIds: [],
+    questions: [],
     round: null,
     idleSince: null,
     deadlines: { retention: input.now + ENDED_RETENTION_MS },

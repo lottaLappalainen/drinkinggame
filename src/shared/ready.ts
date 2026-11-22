@@ -6,12 +6,14 @@
 // ready = those of them who submitted
 // Offline players who haven't answered are listed separately and are NOT in total.
 
+import type { PlayerId } from './protocol';
+
 export type ReadyCounter = { readonly ready: number; readonly total: number };
 
 export function readyCounter(
-  participants: readonly string[],
-  readyIds: ReadonlySet<string>,
-  isOnline: (playerId: string) => boolean,
+  participants: readonly PlayerId[],
+  readyIds: ReadonlySet<PlayerId>,
+  isOnline: (playerId: PlayerId) => boolean,
 ): ReadyCounter {
   let ready = 0;
   let total = 0;

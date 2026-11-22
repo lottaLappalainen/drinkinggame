@@ -9,7 +9,13 @@
 // Mutation model: the engine deep-copies the state into a private `draft`, handlers mutate the
 // draft, and the engine compares before/after to report `changed` (the DO skips the storage
 // write when nothing changed, e.g. for timeSync or rejected messages).
-import type { ErrorCode, Phase, ServerMessage } from '../shared/protocol';
+import type {
+  ClientMessageType,
+  ConnId,
+  ErrorCode,
+  Phase,
+  ServerMessage,
+} from '../shared/protocol';
 import * as players from './handlers/players';
 import * as rounds from './handlers/rounds';
 import type { GameState } from './stateSchema';
@@ -29,6 +35,8 @@ import type {
 type SenderKind =
   /** Any registered connection (identified or not). */
   | 'anyone'
+  /** A connection that is neither a player nor waiting on a "That's me" request. */
+  | 'anonymous'
   /** An active player whose CURRENT socket this is. */
   | 'player'
   /** A connection waiting on a "That's me" request. */
@@ -38,7 +46,12 @@ type MessageRule = {
   readonly sender: SenderKind;
   readonly hostOnly?: true;
   readonly phases: readonly Phase[];
-  /** Carries a roundId; a stale one is silently ignored (double taps, late answers). */
+  /**
+   * Carries a roundId. Checked BEFORE the phase: a stale roundId, or the right roundId in a phase
+   * the message no longer fits (a slow phone's submit arriving in RESULTS, a double-tapped Next
+   * arriving after the next round started), is silently ignored — late answers are ignored, not
+   * errors (G-39).
+   */
   readonly roundBound?: true;
 };
 
@@ -49,7 +62,8 @@ const NOT_ENDED: readonly Phase[] = ['LOBBY', 'QUESTION', 'RESULTS'];
 export const MESSAGE_RULES: { readonly [T in EngineClientMessage['type']]: MessageRule } = {
   hello: { sender: 'anyone', phases: ALL },
   timeSync: { sender: 'anyone', phases: ALL },
-  reclaim: { sender: 'anyone', phases: NOT_ENDED },
+  // Only a phone that is not (yet) anyone may say "That's me" for someone (G-44).
+  reclaim: { sender: 'anonymous', phases: NOT_ENDED },
   cancelReclaim: { sender: 'requester', phases: ALL },
   updateProfile: { sender: 'player', phases: ['LOBBY'] },
   setGameLength: { sender: 'player', hostOnly: true, phases: ['LOBBY'] },
@@ -75,14 +89,17 @@ export function applyEvent(state: GameState, event: EngineEvent, ctx: Ctx): Engi
     case 'message':
       effects = routeMessage(draft, event.from, event.msg, ctx);
       break;
-    case 'connection':
-      effects = players.onConnection(draft, event, ctx);
+    case 'connectionOpened':
+      effects = players.onConnectionOpened(draft, event, ctx);
+      break;
+    case 'connectionClosed':
+      effects = players.onConnectionClosed(draft, event, ctx);
       break;
     case 'rebuild':
-      // Silent: after a wake nothing actually changed, so nothing is broadcast (CLAUDE.md §3).
-      players.onRebuild(draft, event, ctx);
-      rounds.onPlayersChanged(draft, ctx);
-      effects = [];
+      // Effects only for real changes (CLAUDE.md §3): a plain hibernation wake changes nothing and
+      // sends nothing, but a socket that vanished during a restart is a real change — dropping its
+      // consequences (round end, pause) would leave connected phones waiting forever.
+      effects = players.onRebuild(draft, event, ctx);
       break;
     case 'photoStored':
       effects = players.onPhotoStored(draft, event, ctx);
@@ -94,7 +111,7 @@ export function applyEvent(state: GameState, event: EngineEvent, ctx: Ctx): Engi
       return assertNever(event);
   }
 
-  if (event.kind !== 'rebuild' && playerSetKey(draft) !== playersBefore) {
+  if (playerSetKey(draft) !== playersBefore) {
     effects.push(...rounds.onPlayersChanged(draft, ctx));
   }
 
@@ -113,13 +130,13 @@ export function applyClaim(event: ClaimEvent, ctx: Ctx): ClaimResult {
 
 function routeMessage(
   draft: GameState,
-  from: string,
+  from: ConnId,
   msg: EngineClientMessage,
   ctx: Ctx,
 ): Effect[] {
   const connection = draft.connections[from];
-  // The DO registers every socket (connection event) before forwarding its messages.
-  if (connection === undefined) return [errorTo(from, 'NOT_ALLOWED')];
+  // The DO registers every socket (connectionOpened) before forwarding its messages.
+  if (connection === undefined) return [errorTo(from, 'NOT_ALLOWED', msg.type)];
 
   // Clock sync touches no game state (CLAUDE.md §6 "Timer sync").
   if (msg.type === 'timeSync') {
@@ -135,14 +152,18 @@ function routeMessage(
   };
   const rule = MESSAGE_RULES[msg.type];
 
-  if (!senderMatches(draft, sender, rule.sender)) return [errorTo(from, 'NOT_ALLOWED')];
+  const notAllowed = [errorTo(from, 'NOT_ALLOWED', msg.type)];
+
+  if (!senderMatches(draft, sender, rule.sender)) return notAllowed;
   if (rule.hostOnly && (draft.hostId === null || draft.hostId !== sender.playerId)) {
-    return [errorTo(from, 'NOT_ALLOWED')];
+    return notAllowed;
   }
-  if (!rule.phases.includes(draft.phase)) return [errorTo(from, 'NOT_ALLOWED')];
-  if (rule.roundBound && 'roundId' in msg && draft.round?.roundId !== msg.roundId) {
-    return []; // stale: a double tap or an answer for a round that is already over
+  if (rule.roundBound && 'roundId' in msg) {
+    // Before the phase check, so a late action is ignored instead of answered with an error.
+    if (draft.round?.roundId !== msg.roundId) return []; // stale roundId (double tap, old round)
+    if (!rule.phases.includes(draft.phase)) return []; // e.g. a submit arriving after time's up
   }
+  if (!rule.phases.includes(draft.phase)) return notAllowed;
 
   switch (msg.type) {
     case 'hello':
@@ -178,6 +199,8 @@ function senderMatches(draft: GameState, sender: Sender, kind: SenderKind): bool
   switch (kind) {
     case 'anyone':
       return true;
+    case 'anonymous':
+      return sender.playerId === undefined && sender.reclaimRequestId === undefined;
     case 'requester':
       return sender.reclaimRequestId !== undefined;
     case 'player': {
@@ -202,12 +225,17 @@ function playerSetKey(state: GameState): string {
     .join('|');
 }
 
-function send(connId: string, message: ServerMessage): Effect {
+function send(connId: ConnId, message: ServerMessage): Effect {
   return { kind: 'send', connId, message };
 }
 
-function errorTo(connId: string, code: ErrorCode): Effect {
-  return send(connId, { type: 'error', code });
+/** An error reply naming the request it answers (`for`), so the phone knows what failed. */
+export function errorTo(
+  connId: ConnId,
+  code: Exclude<ErrorCode, 'NAME_TAKEN'>,
+  forType: ClientMessageType,
+): Effect {
+  return send(connId, { type: 'error', code, for: forType });
 }
 
 function assertNever(value: never): never {

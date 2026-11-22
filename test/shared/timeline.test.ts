@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { ANSWER_GRACE_MS } from '../../src/shared/constants';
-import { acceptsAnswers, roundCloseDeadline, roundStep } from '../../src/shared/timeline';
+import {
+  acceptsAnswers,
+  nextRoundStepAt,
+  roundCloseDeadline,
+  roundStep,
+} from '../../src/shared/timeline';
 import { canEndEarly, readyCounter } from '../../src/shared/ready';
+import { P } from '../fixtures/common';
 
 const ROUND = { answerStartsAt: 10_000, endsAt: 40_000 };
 
@@ -38,25 +44,26 @@ describe('acceptsAnswers (G-39 grace)', () => {
 });
 
 describe('readyCounter — one definition for G-38 and G-39', () => {
-  const participants = ['a', 'b', 'c', 'd'];
-  const online = new Set(['a', 'b', 'c']); // d is offline
+  const [a, b, c, d] = [P.mikko, P.aino, P.ville, P.sanna];
+  const participants = [a, b, c, d];
+  const online = new Set([a, b, c]); // d is offline
 
   it('counts online-or-ready participants as the total', () => {
-    expect(readyCounter(participants, new Set(['a']), (id) => online.has(id))).toEqual({
+    expect(readyCounter(participants, new Set([a]), (id) => online.has(id))).toEqual({
       ready: 1,
       total: 3,
     });
   });
 
   it('an offline player who already answered still counts', () => {
-    expect(readyCounter(participants, new Set(['d']), (id) => online.has(id))).toEqual({
+    expect(readyCounter(participants, new Set([d]), (id) => online.has(id))).toEqual({
       ready: 1,
       total: 4,
     });
   });
 
   it('is full when everyone online has answered — the offline one is not waited for', () => {
-    const counter = readyCounter(participants, new Set(['a', 'b', 'c']), (id) => online.has(id));
+    const counter = readyCounter(participants, new Set([a, b, c]), (id) => online.has(id));
     expect(counter).toEqual({ ready: 3, total: 3 });
     expect(canEndEarly(10_000, ROUND.answerStartsAt, counter)).toBe(true);
   });
@@ -74,4 +81,23 @@ describe('canEndEarly (G-39)', () => {
   it('not while someone online is still answering', () => {
     expect(canEndEarly(20_000, ROUND.answerStartsAt, { ready: 2, total: 3 })).toBe(false);
   });
+});
+
+describe('nextRoundStepAt — one timer instead of per-frame polling', () => {
+  for (const submitted of [false, true]) {
+    it(`points exactly at the next change of roundStep (submitted: ${submitted})`, () => {
+      for (let now = 0; now <= ROUND.endsAt + 5_000; now += 250) {
+        const next = nextRoundStepAt(now, ROUND, submitted);
+        const here = roundStep(now, ROUND, submitted);
+        if (next === null) {
+          // Only a server message (results) moves the phone on from here.
+          expect(['waiting', 'closed']).toContain(here);
+          expect(roundStep(now + 60_000, ROUND, submitted)).toBe(here);
+          continue;
+        }
+        expect(roundStep(next - 1, ROUND, submitted)).toBe(here);
+        expect(roundStep(next, ROUND, submitted)).not.toBe(here);
+      }
+    });
+  }
 });

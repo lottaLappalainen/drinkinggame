@@ -92,3 +92,41 @@ describe('without Intl.Segmenter (Firefox < 125, inside the browser target)', ()
     }
   });
 });
+
+describe('nickname cleaning — review fixes (Phase 2)', () => {
+  const ch = (...codePoints: number[]) => String.fromCodePoint(...codePoints);
+  const ZWNJ = ch(0x200c);
+  // Flag of Scotland: black flag + tag letters "gbsct" + CANCEL TAG.
+  const SCOTLAND = ch(0x1f3f4, 0xe0067, 0xe0062, 0xe0073, 0xe0063, 0xe0074, 0xe007f);
+
+  it('turns tabs and newlines into spaces instead of gluing words together', () => {
+    expect(cleanNickname('Mikko\tVirtanen')).toBe('Mikko Virtanen');
+    expect(cleanNickname('Mikko\nVirtanen')).toBe('Mikko Virtanen');
+  });
+
+  it('keeps ZERO WIDTH NON-JOINER (needed in e.g. Persian names)', () => {
+    const name = `${ch(0x0645, 0x06cc)}${ZWNJ}${ch(0x062e, 0x0648, 0x0627, 0x0647, 0x0645)}`; // a Persian word that needs a ZWNJ
+    expect(cleanNickname(name)).toBe(name);
+  });
+
+  it('…but ignores it for "Name taken", so it cannot be used to dodge the check (G-14)', () => {
+    expect(nameKey(`Mik${ZWNJ}ko`)).toBe(nameKey('Mikko'));
+  });
+
+  it('keeps subdivision flags (tag sequences) intact', () => {
+    expect(cleanNickname(`Juho ${SCOTLAND}`)).toBe(`Juho ${SCOTLAND}`);
+    expect(graphemeLength(SCOTLAND)).toBe(1);
+  });
+
+  it('strips stray tag characters (invisible text smuggled into a name)', () => {
+    const smuggled = `Aino${ch(0xe0068, 0xe0069)}`; // invisible "hi"
+    expect(cleanNickname(smuggled)).toBe('Aino');
+  });
+
+  it('the source files contain no literal invisible characters (they are written as escapes)', async () => {
+    const { readFileSync } = await import('node:fs');
+    const source = readFileSync('src/shared/nickname.ts', 'utf8');
+    const invisible = [...source].filter((c) => /[\p{Cf}]/u.test(c));
+    expect(invisible.map((c) => c.codePointAt(0)?.toString(16))).toEqual([]);
+  });
+});

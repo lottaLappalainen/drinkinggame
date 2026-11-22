@@ -1,36 +1,67 @@
-// Building blocks shared by the fixtures. Ids follow the protocol format (12 base62 chars).
+// Building blocks shared by the fixtures. Ids are created through the protocol schemas, so they
+// carry their brand (PlayerId, ConnId, …) AND are checked against the real format.
+import * as v from 'valibot';
+import type { PresetId } from '../../src/shared/avatars';
 import { REVEAL_BUFFER_MS } from '../../src/shared/constants';
-import type { Avatar, PublicPlayer } from '../../src/shared/protocol';
+import {
+  ConnIdSchema,
+  GameIdSchema,
+  GameKeySchema,
+  PlayerIdSchema,
+  RequestIdSchema,
+  type Avatar,
+  type ConnId,
+  type GameId,
+  type GameKey,
+  type PlayerId,
+  type PublicPlayer,
+  type RequestId,
+} from '../../src/shared/protocol';
+
+export const playerId = (id: string): PlayerId => v.parse(PlayerIdSchema, id);
+export const connId = (id: string): ConnId => v.parse(ConnIdSchema, id);
+export const gameId = (id: string): GameId => v.parse(GameIdSchema, id);
+export const requestId = (id: string): RequestId => v.parse(RequestIdSchema, id);
+export const gameKey = (key: string): GameKey => v.parse(GameKeySchema, key);
 
 /** A fixed point in time so fixtures are deterministic. */
 export const T0 = 1_800_000_000_000;
 
-export const GAME_KEY = 'ABCDE';
-export const GAME_ID = 'Game00000001';
+export const GAME_KEY = gameKey('ABCDE');
+export const GAME_ID = gameId('Game00000001');
 
 export const P = {
-  mikko: 'Mikko0000001',
-  aino: 'Aino00000002',
-  ville: 'Ville0000003',
-  sanna: 'Sanna0000004',
-  juho: 'Juho00000005',
-  emma: 'Emma00000006',
-  late: 'Late00000007',
+  mikko: playerId('Mikko0000001'),
+  aino: playerId('Aino00000002'),
+  ville: playerId('Ville0000003'),
+  sanna: playerId('Sanna0000004'),
+  juho: playerId('Juho00000005'),
+  emma: playerId('Emma00000006'),
+  late: playerId('Late00000007'),
 } as const;
 
-export const REQUEST_ID = 'Req000000001';
+/** The sockets of the four lobby players in the state fixtures (states.ts). */
+export const C = {
+  mikko: connId('conn-mikko'),
+  aino: connId('conn-aino'),
+  ville: connId('conn-ville'),
+  sanna: connId('conn-sanna'),
+  requester: connId('conn-requester'),
+} as const;
 
-export function preset(presetId: string): Avatar {
+export const REQUEST_ID = requestId('Req000000001');
+
+export function preset(presetId: PresetId): Avatar {
   return { presetId, photoVersion: null };
 }
 
 export function player(
-  playerId: string,
+  id: PlayerId,
   nickname: string,
   overrides: Partial<Omit<PublicPlayer, 'playerId' | 'nickname'>> = {},
 ): PublicPlayer {
   return {
-    playerId,
+    playerId: id,
     nickname,
     avatar: preset('fox'),
     status: 'active',

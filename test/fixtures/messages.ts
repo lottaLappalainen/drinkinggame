@@ -14,7 +14,7 @@ export const MESSAGE_FIXTURES: readonly MessageFixture[] = [
     name: 'ended-updated',
     screen:
       '"The game was updated — please start a new game" (saved state failed version/schema check)',
-    message: { type: 'gameEnded', reason: 'updated' },
+    message: { type: 'gameEnded', reason: 'updated', summary: null },
   },
   {
     name: 'error-not-found',
@@ -79,6 +79,6 @@ export const MESSAGE_FIXTURES: readonly MessageFixture[] = [
   {
     name: 'error-reclaim-unavailable',
     screen: '"That\'s me" not possible (player came back / already requested)',
-    message: { type: 'error', code: 'RECLAIM_UNAVAILABLE' },
+    message: { type: 'error', code: 'RECLAIM_UNAVAILABLE', for: 'reclaim' },
   },
 ];

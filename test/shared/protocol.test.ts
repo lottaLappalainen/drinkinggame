@@ -6,6 +6,8 @@ import {
   ClientMessageSchema,
   CreateGameRequestSchema,
   GameKeySchema,
+  PresetIdSchema,
+  RoundResultsSchema,
   ServerMessageSchema,
   SnapshotSchema,
 } from '../../src/shared/protocol';
@@ -129,5 +131,54 @@ describe('avatar presets', () => {
       expect(preset.tone).toBeGreaterThanOrEqual(1);
       expect(preset.tone).toBeLessThanOrEqual(AVATAR_TONE_COUNT);
     }
+  });
+});
+
+describe('variants make impossible states unrepresentable (Phase 2 review)', () => {
+  const lobby = {
+    phase: 'LOBBY',
+    key: 'ABCDE',
+    gameId: 'Game00000001',
+    hostId: 'Mikko0000001',
+    gameLength: 25,
+    players: [],
+    you: { playerId: 'Mikko0000001' },
+    reclaims: [],
+  };
+
+  it('a LOBBY snapshot cannot carry a round, results or a submitted flag', () => {
+    expect(v.safeParse(SnapshotSchema, lobby).success).toBe(true);
+    expect(v.safeParse(SnapshotSchema, { ...lobby, round: null }).success).toBe(false);
+    expect(v.safeParse(SnapshotSchema, { ...lobby, results: null }).success).toBe(false);
+    expect(
+      v.safeParse(SnapshotSchema, { ...lobby, you: { playerId: 'Mikko0000001', submitted: true } })
+        .success,
+    ).toBe(false);
+  });
+
+  it('results without a ranking cannot carry steps or a ranking', () => {
+    const nobody = {
+      roundId: 1,
+      outcome: 'nobodyAnswered',
+      answerCount: 0,
+      revealStartsAt: 1,
+      revealEndsAt: 1,
+    };
+    expect(v.safeParse(RoundResultsSchema, nobody).success).toBe(true);
+    expect(v.safeParse(RoundResultsSchema, { ...nobody, steps: [] }).success).toBe(false);
+    expect(v.safeParse(RoundResultsSchema, { ...nobody, outcome: 'ranked' }).success).toBe(false);
+  });
+
+  it('only NAME_TAKEN errors may carry reclaimPlayerId; any error may name its request', () => {
+    const ok = (message: unknown) => v.safeParse(ServerMessageSchema, message).success;
+    expect(ok({ type: 'error', code: 'NAME_TAKEN', reclaimPlayerId: 'Emma00000006' })).toBe(true);
+    expect(ok({ type: 'error', code: 'GAME_FULL', reclaimPlayerId: 'Emma00000006' })).toBe(false);
+    expect(ok({ type: 'error', code: 'NOT_ALLOWED', for: 'advance' })).toBe(true);
+    expect(ok({ type: 'error', code: 'NOT_ALLOWED', for: 'nonsense' })).toBe(false);
+  });
+
+  it('avatar presets are a closed list', () => {
+    expect(v.safeParse(PresetIdSchema, 'fox').success).toBe(true);
+    expect(v.safeParse(PresetIdSchema, 'not-a-preset').success).toBe(false);
   });
 });

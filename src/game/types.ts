@@ -11,6 +11,8 @@ import type {
   RequestId,
   ServerMessage,
 } from '../shared/protocol';
+import type { PresetId } from '../shared/avatars';
+import type { WS_CLOSE } from '../shared/constants';
 import type { GameState } from './stateSchema';
 
 export type { GameState };
@@ -38,16 +40,16 @@ export type EngineMessageOf<T extends EngineClientMessage['type']> = Extract<
 export type EngineEvent =
   /** A validated client message from one socket. The sender is looked up in state.connections. */
   | { readonly kind: 'message'; readonly from: ConnId; readonly msg: EngineClientMessage }
-  /** A socket opened or closed during normal operation. Opening registers it as anonymous. */
-  | {
-      readonly kind: 'connection';
-      readonly connId: ConnId;
-      readonly online: boolean;
-      readonly protocolVersion: number;
-    }
+  /** A socket opened during normal operation. It is registered as anonymous until identified. */
+  | { readonly kind: 'connectionOpened'; readonly connId: ConnId; readonly protocolVersion: number }
+  /** A socket closed (or was found dead by the liveness check). */
+  | { readonly kind: 'connectionClosed'; readonly connId: ConnId }
   /**
    * The DO (re)loaded its state (hibernation wake, deploy, restart): ALL sockets that exist,
-   * with what their attachments say. SILENT — no effects are emitted (CLAUDE.md §3).
+   * with what their attachments say. Emits effects ONLY for real changes (CLAUDE.md §3): after a
+   * plain hibernation wake everything matches and nothing is sent; if a player's socket is gone,
+   * the others hear playerConnection — and if that ends the round or flips the pause flag, the
+   * usual roundResults / paused messages go out, so connected phones never wait forever.
    */
   | { readonly kind: 'rebuild'; readonly sockets: readonly RebuildSocket[] }
   /** A photo was stored for this player (bytes saved by the server's upload handler). */
@@ -69,7 +71,7 @@ export type RebuildSocket = {
 export type ClaimEvent = {
   readonly key: GameKey;
   readonly nickname: string;
-  readonly presetId: string;
+  readonly presetId: PresetId;
   readonly tokenHash: string;
 };
 
@@ -96,7 +98,7 @@ export type Effect =
   | {
       readonly kind: 'close';
       readonly connId: ConnId;
-      readonly code: number;
+      readonly code: WsCloseCode;
       readonly reason: string;
     }
   /** The connection got identified — the DO updates that socket's attachment. */
@@ -108,6 +110,8 @@ export type Effect =
     }
   /** Retention or idle cleanup is due: close all sockets, deleteAlarm(), deleteAll(). */
   | { readonly kind: 'deleteGame' };
+
+export type WsCloseCode = (typeof WS_CLOSE)[keyof typeof WS_CLOSE];
 
 // ── Context & result ────────────────────────────────────────────────────────
 
@@ -131,9 +135,3 @@ export type Sender = {
   readonly playerId?: PlayerId;
   readonly reclaimRequestId?: RequestId;
 };
-
-/**
- * Handler shape used by game/handlers/*: handlers MUTATE `draft` (a private deep copy owned by
- * the engine) and return the effects. The engine detects whether anything changed.
- */
-export type Handler<Input> = (draft: GameState, input: Input, ctx: Ctx) => Effect[];

@@ -3,19 +3,20 @@
 //
 // Colors are NOT defined here: `tone` refers to the design tokens --avatar-tone-1 … --avatar-tone-8
 // in client/styles/tokens.css (raw colors live only there — CLAUDE.md §7 "UI architecture").
+//
+// NEVER REMOVE OR RENAME a preset id — only add new ones (and only change emoji/tone). Ids are
+// stored in phones' profiles and in saved games: removing one makes such a saved game fail its
+// schema check (→ ended as 'updated') and such a phone's hello invalid. The client still falls
+// back to a random preset if its stored id is unknown (Phase 5C), as a second line of defence.
 
 export const AVATAR_TONE_COUNT = 8;
+/** 1…AVATAR_TONE_COUNT → CSS token --avatar-tone-N */
+export type AvatarTone = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
-export type AvatarPreset = {
-  /** Stable id stored in profiles and game state — never rename an existing id. */
-  readonly id: string;
-  readonly emoji: string;
-  /** 1…AVATAR_TONE_COUNT → CSS token --avatar-tone-N */
-  readonly tone: number;
-};
+type PresetDefinition = { readonly id: string; readonly emoji: string; readonly tone: AvatarTone };
 
 // Well-established emoji only (supported on old phones too).
-export const AVATAR_PRESETS: readonly AvatarPreset[] = [
+export const AVATAR_PRESETS = [
   { id: 'fox', emoji: '🦊', tone: 1 },
   { id: 'cat', emoji: '🐱', tone: 2 },
   { id: 'dog', emoji: '🐶', tone: 3 },
@@ -46,14 +47,23 @@ export const AVATAR_PRESETS: readonly AvatarPreset[] = [
   { id: 'clown', emoji: '🤡', tone: 4 },
   { id: 'cactus', emoji: '🌵', tone: 5 },
   { id: 'pizza', emoji: '🍕', tone: 6 },
+] as const satisfies readonly PresetDefinition[];
+
+export type AvatarPreset = (typeof AVATAR_PRESETS)[number];
+export type PresetId = AvatarPreset['id'];
+
+export const AVATAR_PRESET_IDS = AVATAR_PRESETS.map((preset) => preset.id) as [
+  PresetId,
+  ...PresetId[],
 ];
 
-export const AVATAR_PRESET_IDS: readonly string[] = AVATAR_PRESETS.map((preset) => preset.id);
-
-export function isAvatarPresetId(id: string): boolean {
-  return AVATAR_PRESET_IDS.includes(id);
+export function isAvatarPresetId(id: string): id is PresetId {
+  return (AVATAR_PRESET_IDS as readonly string[]).includes(id);
 }
 
-export function getAvatarPreset(id: string): AvatarPreset | undefined {
-  return AVATAR_PRESETS.find((preset) => preset.id === id);
+export function getAvatarPreset(id: PresetId): AvatarPreset {
+  const preset = AVATAR_PRESETS.find((p) => p.id === id);
+  // Safe: PresetId is the literal union of exactly these ids.
+  if (preset === undefined) throw new Error(`Unknown avatar preset ${id}`);
+  return preset;
 }

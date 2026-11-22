@@ -30,8 +30,9 @@ export type RevealPosition =
   | { readonly kind: 'done' }; // full ranking
 
 /**
- * Where the reveal is at `now`. Phones call this every frame and render the matching state —
- * they jump to it instead of playing steps one after another (CLAUDE.md §4 State machine).
+ * Where the reveal is at `now`. Phones render the matching state and jump to it instead of playing
+ * steps one after another (CLAUDE.md §4 State machine). Don't call this every frame: render once,
+ * then set ONE timer to nextRevealChangeAt() — re-rendering signals 60 times a second is wasteful.
  */
 export function revealPosition(
   now: number,
@@ -50,7 +51,32 @@ export function revealPosition(
   return { kind: 'step', index };
 }
 
-/** True when the host's Next may be accepted (clock-drift tolerance included, G-45). */
-export function canAdvance(now: number, revealEndsAtMs: number): boolean {
+/**
+ * When revealPosition() will next return something different, or null once the reveal is done.
+ * Phones set a single timer to this instead of polling.
+ */
+export function nextRevealChangeAt(
+  now: number,
+  revealStartsAt: number,
+  stepCount: number,
+): number | null {
+  const boundaries = [revealStartsAt];
+  if (stepCount > 0) {
+    // Steps 1 … n-2 start every STEP; the drumroll starts where step n-1 would have started.
+    for (let i = 1; i < stepCount; i++) boundaries.push(revealStartsAt + i * REVEAL_STEP_MS);
+    boundaries.push(revealStepStartsAt(revealStartsAt, stepCount, stepCount - 1));
+    boundaries.push(revealEndsAt(revealStartsAt, stepCount));
+  }
+  const next = boundaries.filter((t) => t > now).sort((a, b) => a - b)[0];
+  return next ?? null;
+}
+
+/**
+ * SERVER ONLY: whether the host's Next is accepted at `now` (G-45). Includes ADVANCE_EARLY_MS of
+ * clock-drift tolerance. The client must NOT use this to unlock its Next button — it unlocks at
+ * revealEndsAt (revealPosition 'done'); applying the tolerance on both sides would let a host
+ * with a lagging clock tap Next too early and be rejected.
+ */
+export function serverAcceptsAdvance(now: number, revealEndsAtMs: number): boolean {
   return now >= revealEndsAtMs - ADVANCE_EARLY_MS;
 }

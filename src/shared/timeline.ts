@@ -23,6 +23,22 @@ export function roundStep(now: number, round: RoundTimeline, submitted: boolean)
   return 'closed';
 }
 
+/**
+ * When roundStep() will next change for this phone, or null if it won't change by itself (the
+ * phone is waiting, or the round is closed — the next change comes with a server message). Phones
+ * set ONE timer to this instead of re-rendering every frame. The countdown bar is a CSS animation
+ * computed from endsAt, not a per-frame re-render.
+ */
+export function nextRoundStepAt(
+  now: number,
+  round: RoundTimeline,
+  submitted: boolean,
+): number | null {
+  if (now < round.answerStartsAt) return round.answerStartsAt;
+  if (!submitted && now < round.endsAt) return round.endsAt;
+  return null;
+}
+
 /** Server: whether an answer arriving at `now` is accepted (grace for last-moment answers). */
 export function acceptsAnswers(now: number, round: RoundTimeline): boolean {
   return now >= round.answerStartsAt && now <= round.endsAt + ANSWER_GRACE_MS;

@@ -11,7 +11,8 @@ const OWNER = 'Phase 3B';
 
 /**
  * Host starts the game from the LOBBY (G-21: ≥ MIN_PLAYERS active): draw gameLength distinct
- * question ids (Fisher–Yates with ctx.random, G-31) and start round 1.
+ * questions (Fisher–Yates with ctx.random, G-31), store them WITH their text in state.questions
+ * (the game never reads the bank again), and start round 1.
  */
 export function handleStart(
   _draft: GameState,
@@ -25,7 +26,8 @@ export function handleStart(
 /**
  * Ranking submitted (G-36, G-37): only in the answer window (shared/timeline acceptsAnswers),
  * only participants, exactly the round's candidates once each, once per player. Broadcast
- * playerReady (G-38).
+ * playerReady (G-38). An answer after endsAt + grace that arrives before the alarm has closed the
+ * round is IGNORED silently (no error) — like the engine does for submits arriving in RESULTS.
  */
 export function handleSubmit(
   _draft: GameState,
@@ -38,7 +40,8 @@ export function handleSubmit(
 
 /**
  * Host's Next / Finish (G-45): accepted from revealEndsAt − ADVANCE_EARLY_MS (shared/reveal
- * canAdvance); next round, or ENDED after the last question; blocked while paused except Finish.
+ * serverAcceptsAdvance — server only); next round, or ENDED after the last question; blocked
+ * while paused except Finish.
  */
 export function handleAdvance(
   _draft: GameState,
@@ -65,8 +68,8 @@ export function onRoundDeadlines(_draft: GameState, _ctx: Ctx): Effect[] {
 }
 
 /**
- * Called by the engine after ANY change to who is online or active (also after rebuild, with
- * effects dropped). The ONLY place for: ending the round early (shared/ready canEndEarly, G-39),
+ * Called by the engine after ANY change to who is online or active (including after a rebuild —
+ * its effects are sent like any others). The ONLY place for: ending the round early (shared/ready canEndEarly, G-39),
  * and setting/clearing the pause flag (G-42, counting late joiners waiting for their first round).
  */
 export function onPlayersChanged(_draft: GameState, _ctx: Ctx): Effect[] {

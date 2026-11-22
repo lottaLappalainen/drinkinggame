@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { ADVANCE_EARLY_MS, REVEAL_DRUMROLL_MS, REVEAL_STEP_MS } from '../../src/shared/constants';
 import {
-  canAdvance,
+  serverAcceptsAdvance,
   revealEndsAt,
   revealPosition,
+  nextRevealChangeAt,
   revealStepStartsAt,
 } from '../../src/shared/reveal';
 
@@ -96,15 +97,37 @@ describe('revealPosition — phones jump to the current step', () => {
   });
 });
 
-describe('canAdvance — clock drift tolerance (G-45)', () => {
+describe('serverAcceptsAdvance — server-only clock drift tolerance (G-45)', () => {
   const ends = revealEndsAt(START, 4);
 
   it(`accepts Next up to ${ADVANCE_EARLY_MS} ms early`, () => {
-    expect(canAdvance(ends - ADVANCE_EARLY_MS, ends)).toBe(true);
-    expect(canAdvance(ends, ends)).toBe(true);
+    expect(serverAcceptsAdvance(ends - ADVANCE_EARLY_MS, ends)).toBe(true);
+    expect(serverAcceptsAdvance(ends, ends)).toBe(true);
   });
 
   it('rejects Next mid-reveal', () => {
-    expect(canAdvance(ends - ADVANCE_EARLY_MS - 1, ends)).toBe(false);
+    expect(serverAcceptsAdvance(ends - ADVANCE_EARLY_MS - 1, ends)).toBe(false);
   });
+});
+
+describe('nextRevealChangeAt — one timer instead of per-frame polling', () => {
+  for (const steps of [0, 1, 2, 3, 4]) {
+    it(`points exactly at the next change of revealPosition (${steps} steps)`, () => {
+      const end = revealEndsAt(START, steps);
+      for (let now = START - 1_000; now <= end + 1_000; now += 50) {
+        const next = nextRevealChangeAt(now, START, steps);
+        const here = JSON.stringify(revealPosition(now, START, steps));
+        if (next === null) {
+          // Nothing changes any more: the reveal is done.
+          expect(revealPosition(now, START, steps).kind).toBe('done');
+          continue;
+        }
+        expect(next).toBeGreaterThan(now);
+        // No change before `next` …
+        expect(JSON.stringify(revealPosition(next - 1, START, steps))).toBe(here);
+        // … and a change exactly at `next`.
+        expect(JSON.stringify(revealPosition(next, START, steps))).not.toBe(here);
+      }
+    });
+  }
 });
