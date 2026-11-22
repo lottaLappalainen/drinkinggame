@@ -1,0 +1,411 @@
+// Snapshots for EVERY screen (GAME_DESCRIPTION §4.0), each with the `now` at which to render it.
+// Used by the client's dev screen gallery (Phase 5A) and by tests. A test validates every
+// snapshot against SnapshotSchema, and Phase 3 compares them with real engine output, so these
+// can't silently drift from the protocol.
+import {
+  ANSWER_GRACE_MS,
+  QUESTION_INTRO_MS,
+  REVEAL_DRUMROLL_MS,
+  REVEAL_STEP_MS,
+  ROUND_MS,
+} from '../../src/shared/constants';
+import type { PublicRound, RoundResults, Snapshot } from '../../src/shared/protocol';
+import { revealEndsAt, revealStepStartsAt } from '../../src/shared/reveal';
+import {
+  GAME_ID,
+  GAME_KEY,
+  P,
+  REQUEST_ID,
+  REVEAL_STARTS_AT,
+  T0,
+  player,
+  preset,
+  sixPlayers,
+} from './common';
+
+export type ScreenFixture = {
+  readonly name: string;
+  /** Which screen / state this shows (GAME_DESCRIPTION §4.0 numbering). */
+  readonly screen: string;
+  readonly now: number;
+  readonly snapshot: Snapshot;
+};
+
+// ── Building blocks ─────────────────────────────────────────────────────────
+
+const ROUND_STARTED_AT = T0 + 10_000;
+
+function lobby(overrides: Partial<Snapshot> = {}): Snapshot {
+  return {
+    key: GAME_KEY,
+    gameId: GAME_ID,
+    phase: 'LOBBY',
+    endReason: null,
+    paused: false,
+    hostId: P.mikko,
+    gameLength: 25,
+    players: sixPlayers(),
+    you: { playerId: P.mikko, submitted: false },
+    round: null,
+    results: null,
+    reclaims: [],
+    ...overrides,
+  };
+}
+
+function round(overrides: Partial<PublicRound> = {}): PublicRound {
+  const answerStartsAt = ROUND_STARTED_AT + QUESTION_INTRO_MS;
+  return {
+    roundId: 7,
+    number: 7,
+    total: 25,
+    question: { id: 'q0007', text: '[placeholder 07] Who is most likely to …?' },
+    candidates: [P.mikko, P.aino, P.ville, P.sanna, P.juho, P.emma],
+    participants: [P.mikko, P.aino, P.ville, P.sanna, P.juho, P.emma],
+    answerStartsAt,
+    endsAt: answerStartsAt + ROUND_MS,
+    ready: [],
+    ...overrides,
+  };
+}
+
+function question(
+  roundOverrides: Partial<PublicRound>,
+  overrides: Partial<Snapshot> = {},
+): Snapshot {
+  return lobby({ phase: 'QUESTION', round: round(roundOverrides), ...overrides });
+}
+
+const DEFAULT_ROUND = round();
+const ANSWERING_AT = DEFAULT_ROUND.answerStartsAt + 8_000;
+
+function results(r: Omit<RoundResults, 'revealStartsAt' | 'revealEndsAt'>): RoundResults {
+  return {
+    ...r,
+    revealStartsAt: REVEAL_STARTS_AT,
+    revealEndsAt: revealEndsAt(REVEAL_STARTS_AT, r.steps.length),
+  };
+}
+
+function resultsSnapshot(
+  res: RoundResults,
+  roundOverrides: Partial<PublicRound> = {},
+  overrides: Partial<Snapshot> = {},
+): Snapshot {
+  const r = round(roundOverrides);
+  return lobby({
+    phase: 'RESULTS',
+    round: { ...r, ready: r.participants.filter((id) => id !== P.emma) },
+    results: res,
+    ...overrides,
+  });
+}
+
+// Six candidates, five answers: A clear 1st, tie for 2nd, a last place.
+const RANKED = results({
+  roundId: 7,
+  outcome: 'ranked',
+  answerCount: 5,
+  ranking: [
+    { playerId: P.juho, place: 1 },
+    { playerId: P.aino, place: 2 },
+    { playerId: P.ville, place: 2 },
+    { playerId: P.sanna, place: 4 },
+    { playerId: P.mikko, place: 5 },
+    { playerId: P.emma, place: 6 },
+  ],
+  steps: [
+    { kind: 'leastLikely', place: 6, playerIds: [P.emma], rule: null },
+    // place 3 is absorbed by the tie at 2 ("1, 2, 2, 4") → no separate 3rd step
+    { kind: 'second', place: 2, playerIds: [P.aino, P.ville], rule: null },
+    { kind: 'mostLikely', place: 1, playerIds: [P.juho], rule: null },
+  ],
+  // 5 answers ≥ MIN_ANSWERS_FOR_STATS → stats are included (S-6)
+  stats: [
+    { playerId: P.juho, averageSpot: 1.4, firstVotes: 4 },
+    { playerId: P.aino, averageSpot: 2.6, firstVotes: 1 },
+    { playerId: P.ville, averageSpot: 2.6, firstVotes: 0 },
+    { playerId: P.sanna, averageSpot: 4, firstVotes: 0 },
+    { playerId: P.mikko, averageSpot: 4.8, firstVotes: 0 },
+    { playerId: P.emma, averageSpot: 5.6, firstVotes: 0 },
+  ],
+});
+
+// Tie at first place; only 3 answers → no stats.
+const TIE_FIRST = results({
+  roundId: 7,
+  outcome: 'ranked',
+  answerCount: 3,
+  ranking: [
+    { playerId: P.aino, place: 1 },
+    { playerId: P.sanna, place: 1 },
+    { playerId: P.mikko, place: 3 },
+    { playerId: P.ville, place: 4 },
+  ],
+  steps: [
+    { kind: 'leastLikely', place: 4, playerIds: [P.ville], rule: null },
+    { kind: 'third', place: 3, playerIds: [P.mikko], rule: null },
+    { kind: 'mostLikely', place: 1, playerIds: [P.aino, P.sanna], rule: null },
+  ],
+  stats: null,
+});
+
+// Three candidates: "least likely" IS 3rd → steps least likely → 2nd → most likely (G-50).
+const THREE_CANDIDATES = results({
+  roundId: 3,
+  outcome: 'ranked',
+  answerCount: 3,
+  ranking: [
+    { playerId: P.ville, place: 1 },
+    { playerId: P.mikko, place: 2 },
+    { playerId: P.aino, place: 3 },
+  ],
+  steps: [
+    { kind: 'leastLikely', place: 3, playerIds: [P.aino], rule: null },
+    { kind: 'second', place: 2, playerIds: [P.mikko], rule: null },
+    { kind: 'mostLikely', place: 1, playerIds: [P.ville], rule: null },
+  ],
+  stats: null,
+});
+
+const NOT_ENOUGH = results({
+  roundId: 7,
+  outcome: 'notEnoughAnswers',
+  answerCount: 1,
+  ranking: [],
+  steps: [],
+  stats: null,
+});
+
+const NOBODY = results({
+  roundId: 7,
+  outcome: 'nobodyAnswered',
+  answerCount: 0,
+  ranking: [],
+  steps: [],
+  stats: null,
+});
+
+const RANKED_SNAPSHOT = resultsSnapshot(RANKED);
+const stepAt = (i: number) => revealStepStartsAt(REVEAL_STARTS_AT, RANKED.steps.length, i);
+
+// ── The fixtures ────────────────────────────────────────────────────────────
+
+export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
+  // 3. Lobby
+  { name: 'lobby-host', screen: '3 Lobby (host view)', now: T0, snapshot: lobby() },
+  {
+    name: 'lobby-player',
+    screen: '3 Lobby (player view)',
+    now: T0,
+    snapshot: lobby({ you: { playerId: P.aino, submitted: false } }),
+  },
+  {
+    name: 'lobby-two-players',
+    screen: '3 Lobby — Start disabled (< 3 active, G-21)',
+    now: T0,
+    snapshot: lobby({
+      players: [player(P.mikko, 'Mikko'), player(P.aino, 'Aino', { avatar: preset('cat') })],
+    }),
+  },
+  {
+    name: 'lobby-reclaim-pending',
+    screen: '3 Lobby — host sees a "That\'s me" request (G-44)',
+    now: T0,
+    snapshot: lobby({
+      reclaims: [
+        {
+          requestId: REQUEST_ID,
+          targetPlayerId: P.emma,
+          nickname: 'Emma',
+          presetId: 'unicorn',
+          createdAt: T0 - 20_000,
+          expiresAt: T0 + 280_000,
+        },
+      ],
+    }),
+  },
+  {
+    name: 'lobby-host-vacant',
+    screen: '3 Lobby — host role vacant (host left, nobody else online)',
+    now: T0,
+    snapshot: lobby({ hostId: null, you: { playerId: P.aino, submitted: false } }),
+  },
+
+  // 4a–4c. Question round
+  {
+    name: 'question-intro',
+    screen: '4a Question intro (G-49)',
+    now: ROUND_STARTED_AT + 1_000,
+    snapshot: question({}, { you: { playerId: P.aino, submitted: false } }),
+  },
+  {
+    name: 'question-answering',
+    screen: '4b Answering — ranking + timer (G-36)',
+    now: ANSWERING_AT,
+    snapshot: question(
+      { ready: [P.ville, P.juho] },
+      { you: { playerId: P.aino, submitted: false } },
+    ),
+  },
+  {
+    name: 'question-answering-last-seconds',
+    screen: '4b Answering — last seconds (countdown pulse)',
+    now: DEFAULT_ROUND.endsAt - 3_000,
+    snapshot: question(
+      { ready: [P.mikko, P.ville, P.sanna, P.juho] },
+      { you: { playerId: P.aino, submitted: false } },
+    ),
+  },
+  {
+    name: 'question-waiting',
+    screen: '4c Waiting — live ready list, Emma offline (G-38)',
+    now: ANSWERING_AT + 4_000,
+    snapshot: question(
+      { ready: [P.aino, P.ville, P.juho] },
+      { you: { playerId: P.aino, submitted: true } },
+    ),
+  },
+  {
+    name: 'question-closed',
+    screen: '4 Time is up, results on their way',
+    now: DEFAULT_ROUND.endsAt + ANSWER_GRACE_MS / 2,
+    snapshot: question(
+      { ready: [P.aino, P.ville, P.juho] },
+      { you: { playerId: P.sanna, submitted: false } },
+    ),
+  },
+  {
+    name: 'question-late-joiner',
+    screen: '4 Late joiner watching their first round (G-19)',
+    now: ANSWERING_AT,
+    snapshot: question(
+      { ready: [P.ville] },
+      {
+        players: [...sixPlayers(), player(P.late, 'Late Lauri', { waitingForNextRound: true })],
+        you: { playerId: P.late, submitted: false },
+      },
+    ),
+  },
+
+  // 5. Results — the same results at every point of the reveal (G-50)
+  {
+    name: 'results-pending',
+    screen: '5 Results received, reveal about to start',
+    now: REVEAL_STARTS_AT - 100,
+    snapshot: RANKED_SNAPSHOT,
+  },
+  {
+    name: 'results-step-least-likely',
+    screen: '5 Reveal step: LEAST LIKELY',
+    now: stepAt(0) + 500,
+    snapshot: RANKED_SNAPSHOT,
+  },
+  {
+    name: 'results-step-second',
+    screen: '5 Reveal step: 2nd (tie, 3rd absorbed)',
+    now: stepAt(1) + 500,
+    snapshot: RANKED_SNAPSHOT,
+  },
+  {
+    name: 'results-drumroll',
+    screen: '5 Drumroll before MOST LIKELY',
+    now: stepAt(2) - REVEAL_DRUMROLL_MS / 2,
+    snapshot: RANKED_SNAPSHOT,
+  },
+  {
+    name: 'results-step-most-likely',
+    screen: '5 Reveal step: MOST LIKELY',
+    now: stepAt(2) + 500,
+    snapshot: RANKED_SNAPSHOT,
+  },
+  {
+    name: 'results-done-host',
+    screen: '5 Full ranking + stats (≥ 5 answers), host sees Next',
+    now: RANKED.revealEndsAt + 1_000,
+    snapshot: RANKED_SNAPSHOT,
+  },
+  {
+    name: 'results-done-player',
+    screen: '5 Full ranking, player waits for the host',
+    now: RANKED.revealEndsAt + 1_000,
+    snapshot: resultsSnapshot(RANKED, {}, { you: { playerId: P.aino, submitted: true } }),
+  },
+  {
+    name: 'results-tie-first',
+    screen: '5 Tie for MOST LIKELY, no stats (< 5 answers)',
+    now: TIE_FIRST.revealEndsAt + 1_000,
+    snapshot: resultsSnapshot(TIE_FIRST, {
+      candidates: [P.mikko, P.aino, P.ville, P.sanna],
+      participants: [P.mikko, P.aino, P.ville, P.sanna],
+    }),
+  },
+  {
+    name: 'results-three-candidates',
+    screen: '5 Three candidates: least likely = 3rd',
+    now: REVEAL_STARTS_AT + REVEAL_STEP_MS / 2,
+    snapshot: resultsSnapshot(
+      THREE_CANDIDATES,
+      {
+        roundId: 3,
+        number: 3,
+        candidates: [P.mikko, P.aino, P.ville],
+        participants: [P.mikko, P.aino, P.ville],
+      },
+      { players: sixPlayers().slice(0, 3) },
+    ),
+  },
+  {
+    name: 'results-not-enough-answers',
+    screen: '5 "Not enough answers" (S-7)',
+    now: REVEAL_STARTS_AT + 1_000,
+    snapshot: resultsSnapshot(NOT_ENOUGH),
+  },
+  {
+    name: 'results-nobody-answered',
+    screen: '5 "Nobody answered" (S-5)',
+    now: REVEAL_STARTS_AT + 1_000,
+    snapshot: resultsSnapshot(NOBODY),
+  },
+  {
+    name: 'results-last-question',
+    screen: '5 After the last question: host sees Finish',
+    now: RANKED.revealEndsAt + 1_000,
+    snapshot: resultsSnapshot(RANKED, { roundId: 25, number: 25 }),
+  },
+
+  // Pause (G-42)
+  {
+    name: 'paused-results',
+    screen: 'Paused — waiting for players (need 3)',
+    now: RANKED.revealEndsAt + 1_000,
+    snapshot: resultsSnapshot(
+      RANKED,
+      {},
+      {
+        paused: true,
+        players: sixPlayers().map((p) =>
+          p.playerId === P.mikko || p.playerId === P.aino ? p : { ...p, status: 'left' as const },
+        ),
+      },
+    ),
+  },
+
+  // 6. Game over
+  {
+    name: 'ended-finished',
+    screen: '6 Game over — all questions played',
+    now: T0 + 3_600_000,
+    snapshot: lobby({ phase: 'ENDED', endReason: 'finished' }),
+  },
+  {
+    name: 'ended-host-ended',
+    screen: '6 Game over — host ended the game',
+    now: T0 + 600_000,
+    snapshot: lobby({
+      phase: 'ENDED',
+      endReason: 'hostEnded',
+      you: { playerId: P.aino, submitted: false },
+    }),
+  },
+];

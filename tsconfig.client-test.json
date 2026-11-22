@@ -1,0 +1,6 @@
+{
+  // Client tests (test/client): same rules as the client scope (DOM + Preact JSX, ES2023 lib),
+  // because they import client code. They run in Node via Vitest's `client` project.
+  "extends": "./tsconfig.client.json",
+  "include": ["src/client/**/*", "test/client/**/*"]
+}
