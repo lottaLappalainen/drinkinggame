@@ -2,6 +2,7 @@
 // Never answers, tokens or token hashes (CLAUDE.md §5); results only as computed (S-6).
 import type { PlayerId, PublicPlayer, PublicRound, Snapshot } from '../../shared/protocol';
 import { keysOf } from '../ids';
+import { QUESTION_COUNTS } from '../questions';
 import type { GameState, PlayerState, RoundState } from '../stateSchema';
 import { pendingReclaims } from './reclaims';
 
@@ -41,7 +42,7 @@ export function publicRound(state: GameState, round: RoundState): PublicRound {
   if (question === undefined) throw new Error(`Round ${round.roundId} has no question`);
   return {
     roundId: round.roundId,
-    number: round.roundId,
+    number: round.index + 1, // "7 / 25" — the question's position in the game
     total: state.settings.gameLength,
     question: { ...question },
     candidates: [...round.candidates],
@@ -62,7 +63,7 @@ export function buildSnapshot(state: GameState, viewer: PlayerId): Snapshot {
     key: state.key,
     gameId: state.gameId,
     hostId: state.hostId,
-    gameLength: state.settings.gameLength,
+    settings: { gameLength: state.settings.gameLength, categories: [...state.settings.categories] },
     players: publicPlayers(state),
     you: { playerId: viewer },
     reclaims: viewer === state.hostId ? pendingReclaims(state) : [],
@@ -70,7 +71,8 @@ export function buildSnapshot(state: GameState, viewer: PlayerId): Snapshot {
   const { round } = state;
   switch (state.phase) {
     case 'LOBBY':
-      return { ...common, phase: 'LOBBY' };
+      // Counts only (G-22, G-23) — never texts (G-33).
+      return { ...common, phase: 'LOBBY', questionCounts: { ...QUESTION_COUNTS } };
     case 'QUESTION':
       if (round === null) throw new Error('QUESTION without a round');
       return {
@@ -90,6 +92,8 @@ export function buildSnapshot(state: GameState, viewer: PlayerId): Snapshot {
         results: round.results,
       };
     case 'ENDED':
-      return { ...common, phase: 'ENDED', endReason: state.endReason ?? 'finished', summary: null };
+      // An ENDED game always has a reason (invariant) — a missing one is a bug, not a default.
+      if (state.endReason === null) throw new Error('ENDED without an endReason');
+      return { ...common, phase: 'ENDED', endReason: state.endReason, summary: null };
   }
 }

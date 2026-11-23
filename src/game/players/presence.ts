@@ -5,6 +5,7 @@ import { broadcast } from '../effects';
 import { entriesOf } from '../ids';
 import type { GameState, PlayerState } from '../stateSchema';
 import type { Effect } from '../types';
+import { denyReclaimsFor } from './reclaims';
 
 export function isOnline(player: PlayerState): boolean {
   return player.connId !== null;
@@ -16,8 +17,10 @@ export function activePlayers(state: GameState): [PlayerId, PlayerState][] {
 }
 
 /**
- * Make `connId` the player's current socket. Returns the announcement for the others if the
- * player was offline (a replaced socket keeps them online, so nothing is announced then).
+ * Make `connId` the player's current socket. If the player was offline, returns the announcement
+ * for the others — and auto-denies a pending "That's me" for them: the real player is back, so the
+ * host's prompt and the requester's wait end now (G-44). A replaced socket keeps them online, so
+ * nothing happens then.
  */
 export function setOnline(
   state: GameState,
@@ -39,13 +42,11 @@ export function setOnline(
     delete connection.reclaimRequestId;
   }
   refreshIdle(state, now);
-  return wasOffline
-    ? [
-        broadcast({ type: 'playerConnection', playerId, online: true, offlineSince: null }, [
-          playerId,
-        ]),
-      ]
-    : [];
+  if (!wasOffline) return [];
+  return [
+    broadcast({ type: 'playerConnection', playerId, online: true, offlineSince: null }, [playerId]),
+    ...denyReclaimsFor(state, playerId),
+  ];
 }
 
 /** The player has no current socket any more. Returns the announcement for the others. */

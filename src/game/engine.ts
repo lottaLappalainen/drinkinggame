@@ -61,7 +61,7 @@ export const MESSAGE_RULES: { readonly [T in EngineClientMessage['type']]: Messa
   reclaim: { sender: 'anonymous', phases: NOT_ENDED },
   cancelReclaim: { sender: 'requester', phases: ALL },
   updateProfile: { sender: 'player', phases: ['LOBBY'] },
-  setGameLength: { sender: 'player', hostOnly: true, phases: ['LOBBY'] },
+  setSettings: { sender: 'player', hostOnly: true, phases: ['LOBBY'] },
   start: { sender: 'player', hostOnly: true, phases: ['LOBBY'] },
   submit: { sender: 'player', phases: ['QUESTION'], roundBound: true },
   advance: { sender: 'player', hostOnly: true, phases: ['RESULTS'], roundBound: true },
@@ -165,8 +165,8 @@ function routeMessage(
       return players.handleHello(draft, msg, sender, ctx);
     case 'updateProfile':
       return players.handleUpdateProfile(draft, msg, sender, ctx);
-    case 'setGameLength':
-      return players.handleSetGameLength(draft, msg, sender, ctx);
+    case 'setSettings':
+      return players.handleSetSettings(draft, msg, sender, ctx);
     case 'leave':
       return players.handleLeave(draft, msg, sender, ctx);
     case 'removePlayer':

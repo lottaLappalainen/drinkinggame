@@ -16,27 +16,54 @@ const TOKEN = 'abcdefghijklmnopqrstuv'; // 22 base64url chars = 132 bits
 
 describe('client messages are strictly validated', () => {
   it('accepts a resume hello and a join hello', () => {
-    expect(
-      v.safeParse(ClientMessageSchema, { type: 'hello', protocolVersion: 1, token: TOKEN }).success,
-    ).toBe(true);
+    expect(v.safeParse(ClientMessageSchema, { type: 'hello', token: TOKEN }).success).toBe(true);
     expect(
       v.safeParse(ClientMessageSchema, {
         type: 'hello',
-        protocolVersion: 1,
         token: TOKEN,
-        nickname: 'Aino',
-        presetId: 'cat',
+        join: { nickname: 'Aino', presetId: 'cat' },
       }).success,
     ).toBe(true);
+  });
+
+  it('a join is ONE object — a nickname without a preset (or the reverse) cannot be sent', () => {
+    for (const join of [{ nickname: 'Aino' }, { presetId: 'cat' }, {}]) {
+      expect(v.safeParse(ClientMessageSchema, { type: 'hello', token: TOKEN, join }).success).toBe(
+        false,
+      );
+    }
+    // The old flat fields and the protocol version are gone (the version rides on the socket URL).
+    for (const extra of [{ nickname: 'Aino', presetId: 'cat' }, { protocolVersion: 1 }]) {
+      expect(
+        v.safeParse(ClientMessageSchema, { type: 'hello', token: TOKEN, ...extra }).success,
+      ).toBe(false);
+    }
+  });
+
+  it('setSettings carries the whole settings: a known length and at least one known category', () => {
+    const ok = { type: 'setSettings', settings: { gameLength: 25, categories: ['mild', 'spicy'] } };
+    expect(v.safeParse(ClientMessageSchema, ok).success).toBe(true);
+    for (const settings of [
+      { gameLength: 20, categories: ['mild'] }, // only 15/25/35 (G-20)
+      { gameLength: 25, categories: [] }, // at least one category (G-22)
+      { gameLength: 25, categories: ['mild', 'mild'] }, // no duplicates
+      { gameLength: 25, categories: ['wild'] }, // unknown category
+      { gameLength: 25 }, // categories missing
+    ]) {
+      expect(
+        v.safeParse(ClientMessageSchema, { type: 'setSettings', settings }).success,
+        JSON.stringify(settings),
+      ).toBe(false);
+    }
   });
 
   it('rejects unknown types, unknown fields and bad values', () => {
     const bad: unknown[] = [
       { type: 'hack' },
       { type: 'start', extra: 1 }, // strictObject: unknown field
-      { type: 'hello', protocolVersion: 1, token: 'short' }, // token too short
-      { type: 'hello', protocolVersion: 1, token: TOKEN, presetId: 'not-a-preset' },
-      { type: 'setGameLength', length: 20 }, // only 15/25/35 (G-20)
+      { type: 'hello', token: 'short' }, // token too short
+      { type: 'hello', token: TOKEN, join: { nickname: 'A', presetId: 'not-a-preset' } },
+      { type: 'setGameLength', length: 20 }, // renamed to setSettings
       { type: 'submit', roundId: 0, ranking: ['Mikko0000001'] }, // roundId starts at 1
       { type: 'submit', roundId: 1, ranking: Array(MAX_CANDIDATES + 1).fill('Mikko0000001') },
       { type: 'submit', roundId: 1, ranking: ['not an id'] },
@@ -140,7 +167,8 @@ describe('variants make impossible states unrepresentable (Phase 2 review)', () 
     key: 'ABCDE',
     gameId: 'Game00000001',
     hostId: 'Mikko0000001',
-    gameLength: 25,
+    settings: { gameLength: 25, categories: ['mild', 'spicy'] },
+    questionCounts: { mild: 20, spicy: 10, personal: 10 },
     players: [],
     you: { playerId: 'Mikko0000001' },
     reclaims: [],

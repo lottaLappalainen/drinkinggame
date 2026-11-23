@@ -82,12 +82,16 @@ export function denyReclaimsFor(state: GameState, playerId: PlayerId): Effect[] 
     .flatMap(([id]) => denyReclaim(state, id));
 }
 
-/** Requests past RECLAIM_TTL_MS: closed for the host, the requester hears "no" if connected. */
+/**
+ * Requests past RECLAIM_TTL_MS. A PENDING one is denied (closed for the host, the requester hears
+ * "no" if connected); an already decided result nobody collected is simply dropped — it was never
+ * denied, so it must not pass through "denied" on the way out.
+ */
 export function expireReclaims(state: GameState, now: number): Effect[] {
   const effects: Effect[] = [];
   for (const [id, request] of entriesOf(state.reclaims)) {
     if (request.expiresAt > now) continue;
-    effects.push(...denyReclaim(state, id));
+    if (request.status === 'pending') effects.push(...denyReclaim(state, id));
     delete state.reclaims[id]; // an expired result is never collected any more
   }
   return effects;

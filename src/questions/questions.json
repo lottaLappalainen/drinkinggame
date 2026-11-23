@@ -1,162 +1,208 @@
 [
   {
     "id": "q0001",
+    "category": "mild",
     "text": "[placeholder 01] Who is most likely to …?"
   },
   {
     "id": "q0002",
+    "category": "mild",
     "text": "[placeholder 02] Who is most likely to …?"
   },
   {
     "id": "q0003",
+    "category": "mild",
     "text": "[placeholder 03] Who is most likely to …?"
   },
   {
     "id": "q0004",
+    "category": "mild",
     "text": "[placeholder 04] Who is most likely to …?"
   },
   {
     "id": "q0005",
+    "category": "mild",
     "text": "[placeholder 05] Who is most likely to …?"
   },
   {
     "id": "q0006",
+    "category": "mild",
     "text": "[placeholder 06] Who is most likely to …?"
   },
   {
     "id": "q0007",
+    "category": "mild",
     "text": "[placeholder 07] Who is most likely to …?"
   },
   {
     "id": "q0008",
+    "category": "mild",
     "text": "[placeholder 08] Who is most likely to …?"
   },
   {
     "id": "q0009",
+    "category": "mild",
     "text": "[placeholder 09] Who is most likely to …?"
   },
   {
     "id": "q0010",
+    "category": "mild",
     "text": "[placeholder 10] Who is most likely to …?"
   },
   {
     "id": "q0011",
+    "category": "mild",
     "text": "[placeholder 11] Who is most likely to …?"
   },
   {
     "id": "q0012",
+    "category": "mild",
     "text": "[placeholder 12] Who is most likely to …?"
   },
   {
     "id": "q0013",
+    "category": "mild",
     "text": "[placeholder 13] Who is most likely to …?"
   },
   {
     "id": "q0014",
+    "category": "mild",
     "text": "[placeholder 14] Who is most likely to …?"
   },
   {
     "id": "q0015",
+    "category": "mild",
     "text": "[placeholder 15] Who is most likely to …?"
   },
   {
     "id": "q0016",
+    "category": "mild",
     "text": "[placeholder 16] Who is most likely to …?"
   },
   {
     "id": "q0017",
+    "category": "mild",
     "text": "[placeholder 17] Who is most likely to …?"
   },
   {
     "id": "q0018",
+    "category": "mild",
     "text": "[placeholder 18] Who is most likely to …?"
   },
   {
     "id": "q0019",
+    "category": "mild",
     "text": "[placeholder 19] Who is most likely to …?"
   },
   {
     "id": "q0020",
+    "category": "mild",
     "text": "[placeholder 20] Who is most likely to …?"
   },
   {
     "id": "q0021",
+    "category": "spicy",
     "text": "[placeholder 21] Who is most likely to …?"
   },
   {
     "id": "q0022",
+    "category": "spicy",
     "text": "[placeholder 22] Who is most likely to …?"
   },
   {
     "id": "q0023",
+    "category": "spicy",
     "text": "[placeholder 23] Who is most likely to …?"
   },
   {
     "id": "q0024",
+    "category": "spicy",
     "text": "[placeholder 24] Who is most likely to …?"
   },
   {
     "id": "q0025",
+    "category": "spicy",
     "text": "[placeholder 25] Who is most likely to …?"
   },
   {
     "id": "q0026",
+    "category": "spicy",
     "text": "[placeholder 26] Who is most likely to …?"
   },
   {
     "id": "q0027",
-    "text": "[placeholder 27] Who is most likely to …?"
+    "category": "spicy",
+    "text": "[placeholder 27] Who would you … the most?",
+    "labels": "most"
   },
   {
     "id": "q0028",
-    "text": "[placeholder 28] Who is most likely to …?"
+    "category": "spicy",
+    "text": "[placeholder 28] Who would you … the most?",
+    "labels": "most"
   },
   {
     "id": "q0029",
+    "category": "spicy",
     "text": "[placeholder 29] Who is most likely to …?"
   },
   {
     "id": "q0030",
+    "category": "spicy",
     "text": "[placeholder 30] Who is most likely to …?"
   },
   {
     "id": "q0031",
+    "category": "personal",
     "text": "[placeholder 31] Who is most likely to …?"
   },
   {
     "id": "q0032",
+    "category": "personal",
     "text": "[placeholder 32] Who is most likely to …?"
   },
   {
     "id": "q0033",
+    "category": "personal",
     "text": "[placeholder 33] Who is most likely to …?"
   },
   {
     "id": "q0034",
+    "category": "personal",
     "text": "[placeholder 34] Who is most likely to …?"
   },
   {
     "id": "q0035",
+    "category": "personal",
     "text": "[placeholder 35] Who is most likely to …?"
   },
   {
     "id": "q0036",
+    "category": "personal",
     "text": "[placeholder 36] Who is most likely to …?"
   },
   {
     "id": "q0037",
-    "text": "[placeholder 37] Who is most likely to …?"
+    "category": "personal",
+    "text": "[placeholder 37] Who would you … the most?",
+    "labels": "most"
   },
   {
     "id": "q0038",
-    "text": "[placeholder 38] Who is most likely to …?"
+    "category": "personal",
+    "text": "[placeholder 38] Who would you … the most?",
+    "labels": "most"
   },
   {
     "id": "q0039",
-    "text": "[placeholder 39] Who is most likely to …?"
+    "category": "personal",
+    "text": "[placeholder 39] Who would you … the most?",
+    "labels": "most"
   },
   {
     "id": "q0040",
-    "text": "[placeholder 40] Who is most likely to …?"
+    "category": "personal",
+    "text": "[placeholder 40] Who would you … the most?",
+    "labels": "most"
   }
 ]

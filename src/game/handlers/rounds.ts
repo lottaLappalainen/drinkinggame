@@ -17,9 +17,11 @@ import type { Ctx, Effect, EngineMessageOf, Sender } from '../types';
 const OWNER = 'Phase 3B';
 
 /**
- * Host starts the game from the LOBBY (G-21: ≥ MIN_PLAYERS active): draw gameLength distinct
- * questions (Fisher–Yates with ctx.random, G-31), store them WITH their text in state.questions
- * (the game never reads the bank again), and start round 1.
+ * Host starts the game from the LOBBY (G-21: ≥ MIN_PLAYERS active). The chosen categories must
+ * fill the length (G-23: game/questions poolCanFill, else error NOT_ENOUGH_QUESTIONS and stay in
+ * the LOBBY). Draw gameLength distinct questions from questionPool(settings.categories)
+ * (Fisher–Yates with ctx.random, uniform over the pool, G-31), store them WITH text, category and
+ * label set in state.questions (the game never reads the bank again), and start round 1.
  */
 export function handleStart(
   _draft: GameState,

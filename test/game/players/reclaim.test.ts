@@ -75,10 +75,25 @@ describe('the host answers', () => {
     expect(toHostMessages(effects)).toEqual([{ type: 'reclaimClosed', requestId }]);
     expect(game.state.players[P.sanna]?.tokenHash).toBe(fakeTokenHash(REQUESTER_TOKEN));
     expect(game.state.reclaims).toEqual({});
-    // Sanna's old phone (token 4) can't resume any more.
+    expect(game.state.players[P.sanna]?.previousTokenHashes).toEqual([fakeTokenHash(4)]);
+    // Sanna's old phone (token 4) can't resume any more — and is told why, not "Game not found".
     expect(sentTo(game.hello(conn('old-phone'), 4), conn('old-phone'))).toEqual([
-      { type: 'error', code: 'NOT_FOUND', for: 'hello' },
+      { type: 'error', code: 'RECLAIMED', for: 'hello' },
     ]);
+    // Its old token can't be used for a "That's me" either (it must be new to this game).
+    game.close(C.ville);
+    expect(
+      sentTo(
+        game.send(conn('old-phone'), {
+          type: 'reclaim',
+          playerId: P.ville,
+          tokenHash: fakeTokenHash(4),
+          nickname: 'Ville',
+          presetId: 'panda',
+        }),
+        conn('old-phone'),
+      ),
+    ).toEqual([{ type: 'error', code: 'NOT_ALLOWED', for: 'reclaim' }]);
   });
 
   it('deny → the requester hears no and is an anonymous connection again', () => {
@@ -88,12 +103,34 @@ describe('the host answers', () => {
     expect(game.state.connections[REQ]).toEqual({ protocolVersion: 1 });
   });
 
-  it('auto-denied if the real player came back before the host answered', () => {
+  it('auto-denied the moment the real player comes back — no host answer needed (G-44)', () => {
     const { game, requestId } = sannaRequested();
-    game.hello(conn('sanna-back'), 4);
-    const effects = game.send(C.mikko, answer(requestId, true));
+    const effects = game.hello(conn('sanna-back'), 4);
     expect(sentTo(effects, REQ)).toEqual([{ type: 'reclaimResult', approved: false }]);
+    expect(toHostMessages(effects)).toEqual([{ type: 'reclaimClosed', requestId }]);
+    expect(game.state.reclaims).toEqual({});
+    expect(game.state.connections[REQ]).toEqual({ protocolVersion: 1 }); // anonymous again
+    // The host's late tap changes nothing.
+    expect(game.send(C.mikko, answer(requestId, true))).toEqual([]);
     expect(game.state.players[P.sanna]?.tokenHash).toBe(fakeTokenHash(4));
+  });
+
+  it('auto-denied when the real player comes back through a restart (rebuild)', () => {
+    const { game, requestId } = sannaRequested();
+    const effects = game.event({
+      kind: 'rebuild',
+      sockets: [
+        ...Object.entries(game.state.connections).map(([id, c]) => ({
+          connId: id as typeof REQ,
+          protocolVersion: c.protocolVersion,
+          ...(c.playerId !== undefined && { playerId: c.playerId }),
+          ...(c.reclaimRequestId !== undefined && { reclaimRequestId: c.reclaimRequestId }),
+        })),
+        { connId: conn('sanna-socket'), protocolVersion: 1, playerId: P.sanna },
+      ],
+    });
+    expect(sentTo(effects, REQ)).toEqual([{ type: 'reclaimResult', approved: false }]);
+    expect(toHostMessages(effects)).toEqual([{ type: 'reclaimClosed', requestId }]);
   });
 
   it("a late answer to a request that's already gone is ignored", () => {
@@ -137,11 +174,7 @@ describe('collecting on the socket that is still waiting', () => {
     // The restart case: the denial was stored while the socket was bound but unreachable.
     const request = game.state.reclaims[requestId];
     if (request) request.status = 'denied';
-    const effects = game.send(REQ, {
-      type: 'hello',
-      protocolVersion: 1,
-      tokenHash: fakeTokenHash(REQUESTER_TOKEN),
-    });
+    const effects = game.send(REQ, { type: 'hello', tokenHash: fakeTokenHash(REQUESTER_TOKEN) });
     expect(sentTo(effects, REQ)).toEqual([{ type: 'reclaimResult', approved: false }]);
     expect(game.state.connections[REQ]).toEqual({ protocolVersion: 1 });
   });
@@ -161,6 +194,17 @@ describe('closing requests', () => {
     const effects = game.deadline();
     expect(toHostMessages(effects)).toEqual([{ type: 'reclaimClosed', requestId }]);
     expect(sentTo(effects, REQ)).toEqual([{ type: 'reclaimResult', approved: false }]);
+    expect(game.state.reclaims).toEqual({});
+  });
+
+  it('an approved result nobody collected is simply dropped on expiry — no denial is sent', () => {
+    const { game, requestId } = sannaRequested();
+    game.close(REQ); // the requester's phone is away
+    game.send(C.mikko, answer(requestId, true));
+    expect(game.state.reclaims[requestId]?.status).toBe('approved');
+    game.wait(RECLAIM_TTL_MS);
+    const effects = game.deadline();
+    expect(effects.filter((e) => e.kind === 'send' || e.kind === 'sendToHost')).toEqual([]);
     expect(game.state.reclaims).toEqual({});
   });
 

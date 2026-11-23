@@ -151,7 +151,7 @@ describe('routing reaches the right handler', () => {
   it('3A messages and events reach the players handlers (behaviour: test/game/players)', () => {
     const hello = apply(
       lobbyState(),
-      message(C.aino, { type: 'hello', protocolVersion: 1, tokenHash: fakeTokenHash(2) }),
+      message(C.aino, { type: 'hello', tokenHash: fakeTokenHash(2) }),
       ctx,
     );
     expect(hello.effects.some((e) => e.kind === 'send' && e.message.type === 'welcome')).toBe(true);
@@ -192,7 +192,7 @@ describe('MESSAGE_RULES', () => {
       'answerReclaim',
       'end',
       'removePlayer',
-      'setGameLength',
+      'setSettings',
       'start',
     ]);
   });

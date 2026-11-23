@@ -19,7 +19,8 @@ export type { GameState };
 
 // ── Engine-facing client messages ───────────────────────────────────────────
 // On the wire, `hello` and `reclaim` carry the phone's raw token. The DO hashes it synchronously
-// (node:crypto) BEFORE the engine sees the message, so the engine only ever handles hashes:
+// (node:crypto) BEFORE the engine sees the message, so the engine only ever handles hashes.
+// (hello carries no protocol version — that comes with the socket, see `connectionOpened`.)
 //   wire  { type: 'hello',   token, … }  →  engine { type: 'hello',   tokenHash, … }
 //   wire  { type: 'reclaim', token, … }  →  engine { type: 'reclaim', tokenHash, … }
 // Every other message is passed through unchanged.
@@ -40,7 +41,12 @@ export type EngineMessageOf<T extends EngineClientMessage['type']> = Extract<
 export type EngineEvent =
   /** A validated client message from one socket. The sender is looked up in state.connections. */
   | { readonly kind: 'message'; readonly from: ConnId; readonly msg: EngineClientMessage }
-  /** A socket opened during normal operation. It is registered as anonymous until identified. */
+  /**
+   * A socket opened during normal operation. It is registered as anonymous until identified.
+   * `protocolVersion` comes from the WebSocket URL (`/ws/KEY?v=N`; missing or unreadable → 0, i.e.
+   * outdated) and is stored in the socket's attachment by the DO at accept time — the single source
+   * for both this event and later `rebuild`s (CLAUDE.md §4).
+   */
   | { readonly kind: 'connectionOpened'; readonly connId: ConnId; readonly protocolVersion: number }
   /** A socket closed (or was found dead by the liveness check). */
   | { readonly kind: 'connectionClosed'; readonly connId: ConnId }
@@ -86,7 +92,11 @@ export type ClaimResult =
 export type Effect =
   /** Send to one socket (welcome to a new connection, errors to an anonymous one, …). */
   | { readonly kind: 'send'; readonly connId: ConnId; readonly message: ServerMessage }
-  /** Send to every online active player (optionally except some). */
+  /**
+   * Send to every online active player (optionally except some) — delivered to each player's
+   * CURRENT socket, `players[p].connId`, and nowhere else. NOT "every socket whose attachment says
+   * playerId": a replaced socket keeps that until it closes (G-18) and must not get game updates.
+   */
   | {
       readonly kind: 'broadcast';
       readonly message: ServerMessage;

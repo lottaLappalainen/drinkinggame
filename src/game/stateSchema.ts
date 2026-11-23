@@ -11,7 +11,6 @@ import {
   EndReasonSchema,
   GameIdSchema,
   GameKeySchema,
-  GameLengthSchema,
   PhaseSchema,
   PlayerIdSchema,
   PlayerStatusSchema,
@@ -20,6 +19,7 @@ import {
   RoundIdSchema,
   QuestionSchema,
   RoundResultsSchema,
+  SettingsSchema,
   TimestampSchema,
   type ConnId,
   type GameId,
@@ -27,6 +27,7 @@ import {
   type PlayerId,
 } from '../shared/protocol';
 import type { PresetId } from '../shared/avatars';
+import { DEFAULT_CATEGORIES } from '../shared/questionCategories';
 
 /** SHA-256 of a phone-generated token, hex. Raw tokens are never stored. */
 export const TokenHashSchema = v.pipe(v.string(), v.regex(/^[0-9a-f]{64}$/));
@@ -40,6 +41,12 @@ export const PlayerStateSchema = v.strictObject({
   avatar: AvatarSchema,
   /** Kept after leave/remove so that phone gets LEFT / REMOVED instead of "Game not found". */
   tokenHash: TokenHashSchema,
+  /**
+   * Tokens this player had before a "That's me" approval moved them to another phone (G-44). The
+   * old phone then hears RECLAIMED ("continued on another phone") instead of "Game not found".
+   * They never resume the player.
+   */
+  previousTokenHashes: v.array(TokenHashSchema),
   /** The player's CURRENT socket; null = offline. A closing older socket must not mark them offline. */
   connId: v.nullable(ConnIdSchema),
   joinedAt: TimestampSchema,
@@ -102,14 +109,15 @@ export const GameStateSchema = v.strictObject({
   paused: v.boolean(),
   /** null = host role vacant until the next active player connects. */
   hostId: v.nullable(PlayerIdSchema),
-  settings: v.strictObject({ gameLength: GameLengthSchema }),
+  /** The host's lobby choices, locked at Start (G-20, G-22). */
+  settings: SettingsSchema,
   players: v.record(PlayerIdSchema, PlayerStateSchema),
   connections: v.record(ConnIdSchema, ConnectionStateSchema),
   reclaims: v.record(RequestIdSchema, ReclaimStateSchema),
   /**
-   * Drawn once at start, no repeats (G-31) — stored with their TEXT, so the running game never
-   * depends on the bank again: editing or removing questions and deploying mid-party is safe.
-   * (~4 KB for 35 questions.)
+   * Drawn once at start from the chosen categories, no repeats (G-31, G-22) — stored with text,
+   * category and label set, so the running game never depends on the bank again: editing or
+   * removing questions and deploying mid-party is safe. (~5 KB for 35 questions.)
    */
   questions: v.array(QuestionSchema),
   round: v.nullable(RoundStateSchema),
@@ -144,6 +152,7 @@ export function createPlayer(input: NewPlayerInput): PlayerState {
     nameKey: input.nameKey,
     avatar: { presetId: input.presetId, photoVersion: null },
     tokenHash: input.tokenHash,
+    previousTokenHashes: [],
     connId: null,
     joinedAt: input.now,
     connectedSince: null,
@@ -172,7 +181,7 @@ export function createGame(input: CreateGameInput): GameState {
     endReason: null,
     paused: false,
     hostId: input.hostId,
-    settings: { gameLength: DEFAULT_GAME_LENGTH },
+    settings: defaultSettings(),
     players: { [input.hostId]: createPlayer({ ...input.host, activeFromRound: 1 }) },
     connections: {},
     reclaims: {},
@@ -202,7 +211,7 @@ export function createUpdatedEndState(input: {
     endReason: 'updated',
     paused: false,
     hostId: null,
-    settings: { gameLength: DEFAULT_GAME_LENGTH },
+    settings: defaultSettings(),
     players: {},
     connections: {},
     reclaims: {},
@@ -211,6 +220,11 @@ export function createUpdatedEndState(input: {
     idleSince: null,
     deadlines: { retention: input.now + ENDED_RETENTION_MS },
   };
+}
+
+/** A new lobby's settings (G-20, G-22 defaults). */
+export function defaultSettings(): GameState['settings'] {
+  return { gameLength: DEFAULT_GAME_LENGTH, categories: [...DEFAULT_CATEGORIES] };
 }
 
 /** Reconnect identity helper type re-exported for handler signatures. */

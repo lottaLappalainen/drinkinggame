@@ -14,11 +14,11 @@ import { PROTOCOL_VERSION, STATE_VERSION } from '../../src/shared/constants';
 import { ClientMessageSchema, ServerMessageSchema } from '../../src/shared/protocol';
 
 const STATE_FINGERPRINTS: Readonly<Record<number, string>> = {
-  1: '9626e57d87835a91', // Phase 2 contracts (never deployed before this)
+  1: 'b451ca0ec66182cb', // contracts before any game ran anywhere (only the echo page was deployed); categories + previousTokenHashes added without a bump
 };
 
 const PROTOCOL_FINGERPRINTS: Readonly<Record<number, string>> = {
-  1: 'e0aca299a43004f5', // Phase 2 contracts (never deployed before this)
+  1: '95c487efddeb0a20', // contracts before any phone ran a game (only the echo page was deployed); setSettings, join object, leftGame, question categories added without a bump
 };
 
 /** A stable description of a Valibot schema's structure (kinds, keys, literals, checks). */

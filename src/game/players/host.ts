@@ -19,7 +19,8 @@ export function pickNewHost(state: GameState, except?: PlayerId): PlayerId | nul
       ([idA, a], [idB, b]) =>
         (a.connectedSince ?? Infinity) - (b.connectedSince ?? Infinity) ||
         a.joinedAt - b.joinedAt ||
-        idA.localeCompare(idB),
+        // Plain code-unit comparison: localeCompare depends on the runtime's locale.
+        (idA < idB ? -1 : idA > idB ? 1 : 0),
     );
   return candidates[0]?.[0] ?? null;
 }

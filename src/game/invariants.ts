@@ -91,7 +91,18 @@ export function checkInvariants(state: GameState): string[] {
       );
     const ids = state.questions.map((q) => q.id);
     if (new Set(ids).size !== ids.length) fail('a question was drawn twice (G-31)');
+    for (const question of state.questions)
+      if (!state.settings.categories.includes(question.category))
+        fail(`question ${question.id} is from a category that wasn't chosen (G-22)`);
   }
+
+  // ── Tokens (G-44) ────────────────────────────────────────────────────────
+  // A superseded token must never also be someone's current token (it would both resume a player
+  // and be told RECLAIMED).
+  const currentTokens = new Set(Object.values(players).map((p) => p.tokenHash));
+  for (const [id, player] of entriesOf(players))
+    for (const old of player.previousTokenHashes)
+      if (currentTokens.has(old)) fail(`player ${id}: a previous token is someone's current token`);
 
   if (round !== null) problems.push(...checkRound(state, round));
 
@@ -111,6 +122,8 @@ function checkRound(state: GameState, round: RoundState): string[] {
   const isPlayer = (id: PlayerId) => state.players[id] !== undefined;
 
   if (round.index >= state.questions.length) fail(`round.index ${round.index} has no question`);
+  // One round per question, in order: round N shows question N (index N − 1).
+  if (round.roundId !== round.index + 1) fail('round.roundId must be round.index + 1');
   // Candidates stay rankable for their round even if they leave meanwhile (G-41) → they must
   // exist, but needn't be active.
   if (round.candidates.length < 1 || round.candidates.length > MAX_CANDIDATES)
@@ -189,7 +202,10 @@ export function checkSnapshotInvariants(snapshot: Snapshot): string[] {
     for (const id of round.ready)
       if (!round.participants.includes(id)) fail(`ready player ${id} is not a participant`);
     if (round.endsAt <= round.answerStartsAt) fail('round ends before answering starts');
-    if (round.number !== round.roundId) fail('round.number must equal roundId (1-based)');
+    if (round.number < 1 || round.number > round.total)
+      fail(`question number ${round.number} outside 1…${round.total}`);
+    if (!snapshot.settings.categories.includes(round.question.category))
+      fail(`question from a category that wasn't chosen (G-22)`);
   }
   if (snapshot.phase === 'RESULTS') {
     if (snapshot.results.roundId !== snapshot.round.roundId)

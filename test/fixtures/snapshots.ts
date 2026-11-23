@@ -45,14 +45,17 @@ export type ScreenFixture = {
 const ROUND_STARTED_AT = T0 + 10_000;
 
 /** Fields every phase has. */
-type Common = Omit<SnapshotOf<'LOBBY'>, 'phase'>;
+type Common = Omit<SnapshotOf<'LOBBY'>, 'phase' | 'questionCounts'>;
+
+/** Matches the placeholder bank (20 mild, 10 spicy, 10 personal). */
+const QUESTION_COUNTS = { mild: 20, spicy: 10, personal: 10 } as const;
 
 function common(overrides: Partial<Common> = {}): Common {
   return {
     key: GAME_KEY,
     gameId: GAME_ID,
     hostId: P.mikko,
-    gameLength: 25,
+    settings: { gameLength: 25, categories: ['mild', 'spicy'] },
     players: sixPlayers(),
     you: { playerId: P.mikko },
     reclaims: [],
@@ -61,7 +64,7 @@ function common(overrides: Partial<Common> = {}): Common {
 }
 
 function lobby(overrides: Partial<Common> = {}): SnapshotOf<'LOBBY'> {
-  return { ...common(overrides), phase: 'LOBBY' };
+  return { ...common(overrides), phase: 'LOBBY', questionCounts: { ...QUESTION_COUNTS } };
 }
 
 function round(overrides: Partial<PublicRound> = {}): PublicRound {
@@ -70,7 +73,12 @@ function round(overrides: Partial<PublicRound> = {}): PublicRound {
     roundId: 7,
     number: 7,
     total: 25,
-    question: { id: 'q0007', text: '[placeholder 07] Who is most likely to …?' },
+    question: {
+      id: 'q0007',
+      text: '[placeholder 07] Who is most likely to …?',
+      category: 'mild',
+      labels: 'likely',
+    },
     candidates: [P.mikko, P.aino, P.ville, P.sanna, P.juho, P.emma],
     participants: [P.mikko, P.aino, P.ville, P.sanna, P.juho, P.emma],
     answerStartsAt,
@@ -255,6 +263,12 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
     now: T0,
     snapshot: lobby({ hostId: null, you: { playerId: P.aino } }),
   },
+  {
+    name: 'lobby-not-enough-questions',
+    screen: '3 Lobby — only Personal chosen: 25 and 35 disabled, Start disabled (G-22, G-23)',
+    now: T0,
+    snapshot: lobby({ settings: { gameLength: 25, categories: ['personal'] } }),
+  },
 
   // 4a–4c. Question round
   {
@@ -268,6 +282,22 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
     screen: '4b Answering — ranking + timer (G-36)',
     now: ANSWERING_AT,
     snapshot: question({ ready: [P.ville, P.juho] }, AINO_WAITING),
+  },
+  {
+    name: 'question-answering-most-labels',
+    screen: '4b Answering — a "the most" question: spots say Most / Least (Q-8)',
+    now: ANSWERING_AT,
+    snapshot: question(
+      {
+        question: {
+          id: 'q0027',
+          text: '[placeholder 27] Who would you … the most?',
+          category: 'spicy',
+          labels: 'most',
+        },
+      },
+      AINO_WAITING,
+    ),
   },
   {
     name: 'question-answering-last-seconds',

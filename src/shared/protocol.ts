@@ -8,6 +8,8 @@
 // round; results without a ranking have no reveal steps) — impossible states don't type-check.
 import * as v from 'valibot';
 import { AVATAR_PRESET_IDS } from './avatars';
+import { CATEGORY_IDS } from './questionCategories';
+import { LABEL_SET_IDS } from './questionLabels';
 import {
   GAME_KEY_ALPHABET,
   GAME_KEY_LENGTH,
@@ -53,6 +55,25 @@ export const PresetIdSchema = v.picklist(AVATAR_PRESET_IDS);
 
 export const GameLengthSchema = v.picklist(GAME_LENGTHS);
 
+/** Question category (Q-7) — ids are never renamed or removed (shared/questionCategories.ts). */
+export const CategoryIdSchema = v.picklist(CATEGORY_IDS);
+
+/** A category selection (G-22): at least one, no duplicates. */
+export const CategoriesSchema = v.pipe(
+  v.array(CategoryIdSchema),
+  v.minLength(1, 'Choose at least one category'),
+  v.check((ids) => new Set(ids).size === ids.length, 'Duplicate category'),
+);
+
+/** Label set naming the spot / reveal words (Q-8, shared/questionLabels.ts). */
+export const LabelSetIdSchema = v.picklist(LABEL_SET_IDS);
+
+/** The host's lobby settings (G-20, G-22) — locked at Start. */
+export const SettingsSchema = v.strictObject({
+  gameLength: GameLengthSchema,
+  categories: CategoriesSchema,
+});
+
 export const RoundIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
 
 // ── Shared building blocks ──────────────────────────────────────────────────
@@ -80,9 +101,15 @@ export const PublicPlayerSchema = v.strictObject({
   waitingForNextRound: v.boolean(),
 });
 
+/**
+ * A question as stored in a game and sent to phones (Q-2). `labels` is always present here; the
+ * bank file may omit it (game/questions.ts defaults it to 'likely').
+ */
 export const QuestionSchema = v.strictObject({
   id: v.pipe(v.string(), v.minLength(1)),
   text: v.pipe(v.string(), v.minLength(1), v.maxLength(QUESTION_MAX_LENGTH)),
+  category: CategoryIdSchema,
+  labels: LabelSetIdSchema,
 });
 
 /** A running round as phones see it (no answers — only who is ready). */
@@ -174,7 +201,7 @@ const SNAPSHOT_COMMON = {
   gameId: GameIdSchema,
   /** null = host role vacant (nobody online to take it over). */
   hostId: v.nullable(PlayerIdSchema),
-  gameLength: GameLengthSchema,
+  settings: SettingsSchema,
   players: v.array(PublicPlayerSchema),
   /** Pending "That's me" requests — host only; always [] for other players. */
   reclaims: v.array(PublicReclaimSchema),
@@ -186,7 +213,20 @@ const SNAPSHOT_COMMON = {
  * A variant on `phase`, so every phase carries exactly the fields it can have.
  */
 export const SnapshotSchema = v.variant('phase', [
-  v.strictObject({ ...SNAPSHOT_COMMON, phase: v.literal('LOBBY'), you: YouSchema }),
+  v.strictObject({
+    ...SNAPSHOT_COMMON,
+    phase: v.literal('LOBBY'),
+    you: YouSchema,
+    /**
+     * Questions per category, for the host's chips and the lengths a selection can fill (G-22,
+     * G-23). Counts only — phones never see question texts in advance (G-33).
+     */
+    questionCounts: v.strictObject({
+      mild: v.pipe(v.number(), v.integer(), v.minValue(0)),
+      spicy: v.pipe(v.number(), v.integer(), v.minValue(0)),
+      personal: v.pipe(v.number(), v.integer(), v.minValue(0)),
+    }),
+  }),
   v.strictObject({
     ...SNAPSHOT_COMMON,
     phase: v.literal('QUESTION'),
@@ -232,6 +272,8 @@ const OTHER_ERROR_CODES = [
   'LEFT', // this phone's player left the game (G-41)
   'REMOVED', // this phone's player was removed (G-43)
   'REPLACED', // sent right before closing a replaced socket (G-18)
+  'RECLAIMED', // this phone's token was superseded: "That's me" moved the player to another phone (G-44)
+  'NOT_ENOUGH_QUESTIONS', // start: the chosen categories can't fill the game length (G-23)
   'CREATE_FAILED', // HTTP POST /api/games: no free game key found after the retries
 ] as const;
 
@@ -243,16 +285,24 @@ export const ErrorCodeSchema = v.picklist([
 // ── Client → server ─────────────────────────────────────────────────────────
 // strictObject everywhere: unknown fields in untrusted input are rejected.
 
+/** The profile a phone joins with (explicit Join tap only). */
+export const JoinProfileSchema = v.strictObject({
+  nickname: NicknameInputSchema,
+  presetId: PresetIdSchema,
+});
+
+/**
+ * No protocolVersion here: the phone puts it in the WebSocket URL (`/ws/KEY?v=N`), so the version
+ * is known — and checked — when the socket opens, before any message (CLAUDE.md §4).
+ */
 export const HelloMessageSchema = v.strictObject({
   type: v.literal('hello'),
-  protocolVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
   /** The phone's own token for this game key, saved before sending (CLAUDE.md §3). */
   token: TokenSchema,
   /** The game this phone last saw under this key — mismatch → NOT_FOUND. */
   gameId: v.exactOptional(GameIdSchema),
   /** ONLY on an explicit Join tap, never on automatic reconnects (CLAUDE.md §5). */
-  nickname: v.exactOptional(NicknameInputSchema),
-  presetId: v.exactOptional(PresetIdSchema),
+  join: v.exactOptional(JoinProfileSchema),
 });
 
 export const ReclaimMessageSchema = v.strictObject({
@@ -271,7 +321,12 @@ export const ClientMessageSchema = v.variant('type', [
     nickname: v.exactOptional(NicknameInputSchema),
     presetId: v.exactOptional(PresetIdSchema),
   }),
-  v.strictObject({ type: v.literal('setGameLength'), length: GameLengthSchema }),
+  /**
+   * Host, lobby only (G-20, G-22): the WHOLE desired settings (idempotent; mirrors
+   * settingsChanged). A selection too small for the length is accepted — the host may be changing
+   * both — and `start` refuses it (G-23).
+   */
+  v.strictObject({ type: v.literal('setSettings'), settings: SettingsSchema }),
   v.strictObject({ type: v.literal('start') }),
   v.strictObject({
     type: v.literal('submit'),
@@ -296,7 +351,7 @@ export const ClientMessageSchema = v.variant('type', [
 export const CLIENT_MESSAGE_TYPES = [
   'hello',
   'updateProfile',
-  'setGameLength',
+  'setSettings',
   'start',
   'submit',
   'advance',
@@ -357,7 +412,12 @@ export const ServerMessageSchema = v.variant('type', [
     nickname: v.string(),
     avatar: AvatarSchema,
   }),
-  v.strictObject({ type: v.literal('settingsChanged'), gameLength: GameLengthSchema }),
+  v.strictObject({ type: v.literal('settingsChanged'), settings: SettingsSchema }),
+  /**
+   * To the leaving phone only: the leave went through (G-41). The phone keeps its token until this
+   * arrives — if the connection drops first, a reconnect with that token gets LEFT instead.
+   */
+  v.strictObject({ type: v.literal('leftGame') }),
   /** A new round. Late joiners listed in round.participants are no longer waiting. */
   v.strictObject({ type: v.literal('roundStarted'), round: PublicRoundSchema }),
   v.strictObject({
@@ -410,6 +470,9 @@ export type RequestId = v.InferOutput<typeof RequestIdSchema>;
 export type ConnId = v.InferOutput<typeof ConnIdSchema>;
 export type GameKey = v.InferOutput<typeof GameKeySchema>;
 export type GameLength = v.InferOutput<typeof GameLengthSchema>;
+export type Settings = v.InferOutput<typeof SettingsSchema>;
+export type QuestionCounts = SnapshotOf<'LOBBY'>['questionCounts'];
+export type JoinProfile = v.InferOutput<typeof JoinProfileSchema>;
 export type Avatar = v.InferOutput<typeof AvatarSchema>;
 export type Phase = v.InferOutput<typeof PhaseSchema>;
 export type EndReason = v.InferOutput<typeof EndReasonSchema>;
@@ -443,3 +506,5 @@ export type MessageOf<M extends { type: string }, T extends M['type']> = Extract
 // Compile-time check: CLIENT_MESSAGE_TYPES lists exactly the client message types.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const _CLIENT_TYPES_COMPLETE: Same<(typeof CLIENT_MESSAGE_TYPES)[number], ClientMessageType> = true;
+// Compile-time check: questionCounts has exactly one entry per category.
+const _COUNTS_COMPLETE: Same<keyof QuestionCounts, (typeof CATEGORY_IDS)[number]> = true;

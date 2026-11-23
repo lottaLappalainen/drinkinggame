@@ -40,12 +40,58 @@ describe('own profile, lobby only (G-1, G-5, G-6)', () => {
     expect(game.send(C.aino, { type: 'updateProfile', presetId: 'cat' })).toEqual([]);
   });
 
-  it('the host sets the game length (G-20); only the host (engine rule)', () => {
+  it('the host sets length and categories (G-20, G-22); only the host (engine rule)', () => {
     const game = session(lobbyState());
-    expect(broadcasts(game.send(C.mikko, { type: 'setGameLength', length: 35 }))).toEqual([
-      { type: 'settingsChanged', gameLength: 35 },
+    const settings = { gameLength: 35, categories: ['personal', 'mild'] } as const;
+    expect(
+      broadcasts(
+        game.send(C.mikko, {
+          type: 'setSettings',
+          settings: { ...settings, categories: [...settings.categories] },
+        }),
+      ),
+    ).toEqual([
+      // Stored and announced in display order.
+      { type: 'settingsChanged', settings: { gameLength: 35, categories: ['mild', 'personal'] } },
     ]);
-    expect(game.send(C.mikko, { type: 'setGameLength', length: 35 })).toEqual([]);
+    // Same settings again (in any order) → nothing.
+    expect(
+      game.send(C.mikko, {
+        type: 'setSettings',
+        settings: { gameLength: 35, categories: ['mild', 'personal'] },
+      }),
+    ).toEqual([]);
+    expect(
+      game.send(C.aino, {
+        type: 'setSettings',
+        settings: { gameLength: 15, categories: ['mild'] },
+      }),
+    ).toEqual([
+      {
+        kind: 'send',
+        connId: C.aino,
+        message: { type: 'error', code: 'NOT_ALLOWED', for: 'setSettings' },
+      },
+    ]);
+  });
+
+  it('a selection too small for the length is accepted here — start refuses it (G-23)', () => {
+    const game = session(lobbyState());
+    const effects = game.send(C.mikko, {
+      type: 'setSettings',
+      settings: { gameLength: 35, categories: ['personal'] }, // 10 placeholder questions
+    });
+    expect(types(broadcasts(effects))).toEqual(['settingsChanged']);
+    expect(game.state.settings).toEqual({ gameLength: 35, categories: ['personal'] });
+  });
+
+  it('the lobby snapshot carries question counts per category, never texts (G-22, G-33)', () => {
+    const game = session(lobbyState());
+    const welcome = only(sentTo(game.hello(conn('aino-2'), 2), conn('aino-2')), 'welcome');
+    if (welcome.snapshot.phase !== 'LOBBY') throw new Error('expected the lobby');
+    expect(welcome.snapshot.questionCounts).toEqual({ mild: 20, spicy: 10, personal: 10 });
+    expect(welcome.snapshot.settings).toEqual({ gameLength: 25, categories: ['mild', 'spicy'] });
+    expect(JSON.stringify(welcome)).not.toContain('placeholder');
   });
 });
 
@@ -59,6 +105,8 @@ describe('leaving (G-41)', () => {
       reason: 'left',
     });
     expect(effects).toContainEqual({ kind: 'bindConnection', connId: C.aino });
+    // The leaving phone itself is told the leave went through (it keeps its token until then).
+    expect(sentTo(effects, C.aino)).toEqual([{ type: 'leftGame' }]);
     expect(game.state.players[P.aino]?.status).toBe('left');
     // The name is free again…
     expect(
@@ -159,7 +207,17 @@ describe('the snapshot', () => {
       'welcome',
     );
     expect(Object.keys(welcome.snapshot).sort()).toEqual(
-      ['gameId', 'gameLength', 'hostId', 'key', 'phase', 'players', 'reclaims', 'you'].sort(),
+      [
+        'gameId',
+        'hostId',
+        'key',
+        'phase',
+        'players',
+        'questionCounts',
+        'reclaims',
+        'settings',
+        'you',
+      ].sort(),
     );
   });
 });

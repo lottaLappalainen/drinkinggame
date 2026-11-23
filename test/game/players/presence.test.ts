@@ -83,6 +83,29 @@ describe('host handover (GAME_DESCRIPTION §10, G-41)', () => {
     expect(only(sentTo(effects, conn('ville-2')), 'welcome').snapshot.hostId).toBe(P.ville);
   });
 
+  it('a socket gets its welcome BEFORE any update — also when it fills the vacant host role', () => {
+    const game = session(lobbyState());
+    for (const c of [C.aino, C.ville, C.sanna, C.mikko]) game.close(c);
+    game.wait(HOST_HANDOVER_MS);
+    game.deadline();
+    // Resuming: welcome, then the delta that also reaches this very phone.
+    const resumed = game.hello(conn('ville-2'), 3);
+    expect(resumed.map((e) => (e.kind === 'send' ? e.message.type : e.kind))).toEqual([
+      'bindConnection',
+      'welcome',
+      'broadcast', // playerConnection (others only)
+      'broadcast', // hostChanged — the new host hears it after its snapshot
+    ]);
+    // Joining as a new player takes the same path.
+    const fresh = session(lobbyState());
+    for (const c of [C.aino, C.ville, C.sanna, C.mikko]) fresh.close(c);
+    fresh.wait(HOST_HANDOVER_MS);
+    fresh.deadline();
+    const joined = fresh.hello(conn('juho'), 9, { nickname: 'Juho' });
+    const order = joined.map((e) => (e.kind === 'send' ? e.message.type : e.kind));
+    expect(order.indexOf('welcome')).toBeLessThan(order.indexOf('broadcast'));
+  });
+
   it('the new host is told about pending "That\'s me" requests', () => {
     const game = session(lobbyState());
     game.close(C.sanna);

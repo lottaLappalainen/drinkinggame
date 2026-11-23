@@ -63,9 +63,8 @@ export function session(initial: GameState, start = T0 + 20_000) {
         from: conn,
         msg: {
           type: 'hello',
-          protocolVersion: PROTOCOL_VERSION,
           tokenHash: fakeTokenHash(token),
-          ...(join && { nickname: join.nickname, presetId: join.presetId ?? 'fox' }),
+          ...(join && { join: { nickname: join.nickname, presetId: join.presetId ?? 'fox' } }),
         },
       });
     },

@@ -14,7 +14,8 @@ import {
   REMOVE_OFFLINE_MIN_MS,
   WS_CLOSE,
 } from '../../shared/constants';
-import type { ConnId, ErrorCode, PlayerId, RequestId } from '../../shared/protocol';
+import type { ConnId, ErrorCode, PlayerId, RequestId, Settings } from '../../shared/protocol';
+import { normalizeCategories } from '../../shared/questionCategories';
 import { idleCleanupAt } from '../deadlines';
 import {
   bindToPlayer,
@@ -97,16 +98,8 @@ export function handleHello(
 ): Effect[] {
   const { connId } = sender;
   const fail = (code: Exclude<ErrorCode, 'NAME_TAKEN'>) => [errorTo(connId, code, 'hello')];
-
-  const mismatch = protocolMismatch(msg.protocolVersion);
-  if (mismatch !== null) {
-    return [
-      errorTo(connId, mismatch, 'hello'),
-      close(connId, WS_CLOSE.PROTOCOL_MISMATCH, mismatch),
-    ];
-  }
+  // (The protocol version was checked when the socket opened — it comes in the WebSocket URL.)
   const connection = draft.connections[connId];
-  if (connection) connection.protocolVersion = msg.protocolVersion;
 
   // The saved game failed its version check: everyone just hears that it was updated.
   if (draft.phase === 'ENDED' && draft.endReason === 'updated') {
@@ -131,6 +124,9 @@ export function handleHello(
     effects.push(...attachAsPlayer(draft, playerId, connId, ctx.now));
     return effects;
   }
+
+  // This phone's player continued on another phone through an approved "That's me" (G-44).
+  if (findPlayerByPreviousToken(draft, msg.tokenHash)) return fail('RECLAIMED');
 
   // A "That's me" requester whose phone reconnected (screen lock, restart).
   const request = findReclaimByToken(draft, msg.tokenHash);
@@ -166,15 +162,15 @@ function joinAsNewPlayer(
   const { connId } = sender;
   const fail = (code: Exclude<ErrorCode, 'NAME_TAKEN'>) => [errorTo(connId, code, 'hello')];
 
-  // No nickname = an automatic reconnect with a token this game doesn't know (G-12).
-  if (msg.nickname === undefined) return fail('NOT_FOUND');
+  // No join profile = an automatic reconnect with a token this game doesn't know (G-12).
+  const { join } = msg;
+  if (join === undefined) return fail('NOT_FOUND');
   // A finished game takes no new players; only known tokens still see Game Over (G-12, G-48).
   if (draft.phase === 'ENDED') return fail('NOT_FOUND');
   if (sender.playerId !== undefined || sender.reclaimRequestId !== undefined)
     return fail('NOT_ALLOWED');
-  if (msg.presetId === undefined) return fail('INVALID');
 
-  const name = validateNickname(msg.nickname);
+  const name = validateNickname(join.nickname);
   if (!name.ok) return fail('INVALID_NICKNAME');
   const key = nameKey(name.nickname);
   const holder = activePlayers(draft).find(([, player]) => player.nameKey === key);
@@ -199,7 +195,7 @@ function joinAsNewPlayer(
     ...createPlayer({
       nickname: name.nickname,
       nameKey: key,
-      presetId: msg.presetId,
+      presetId: join.presetId,
       tokenHash: msg.tokenHash,
       now: ctx.now,
       // Late joiners take part from the next question (G-15, G-19).
@@ -211,14 +207,16 @@ function joinAsNewPlayer(
   };
   draft.players[playerId] = player;
   setOnline(draft, playerId, connId, ctx.now); // a join is announced as playerJoined instead
+  const hostEffects = fillVacantHost(draft, playerId);
 
+  // Welcome first (built from the state after this step), then the deltas (CLAUDE.md §5).
   return [
     bindToPlayer(connId, playerId),
+    welcome(draft, playerId, connId, ctx.now),
     broadcast({ type: 'playerJoined', player: toPublicPlayer(draft, playerId, player) }, [
       playerId,
     ]),
-    ...fillVacantHost(draft, playerId),
-    welcome(draft, playerId, connId, ctx.now),
+    ...hostEffects,
   ];
 }
 
@@ -257,16 +255,26 @@ export function handleUpdateProfile(
   ];
 }
 
-/** Host, LOBBY only: 15 / 25 / 35 (G-20). */
-export function handleSetGameLength(
+/**
+ * Host, LOBBY only: game length and categories (G-20, G-22). Takes the whole settings object.
+ * A selection that can't fill the length is accepted here (the host may be mid-way through
+ * changing both); `start` refuses it (G-23).
+ */
+export function handleSetSettings(
   draft: GameState,
-  msg: EngineMessageOf<'setGameLength'>,
+  msg: EngineMessageOf<'setSettings'>,
   _sender: Sender,
   _ctx: Ctx,
 ): Effect[] {
-  if (draft.settings.gameLength === msg.length) return [];
-  draft.settings.gameLength = msg.length;
-  return [broadcast({ type: 'settingsChanged', gameLength: msg.length })];
+  const next: Settings = {
+    gameLength: msg.settings.gameLength,
+    categories: normalizeCategories(msg.settings.categories),
+  };
+  if (JSON.stringify(next) === JSON.stringify(draft.settings)) return [];
+  draft.settings = next;
+  return [
+    broadcast({ type: 'settingsChanged', settings: { ...next, categories: [...next.categories] } }),
+  ];
 }
 
 // ── Leaving & removal (G-41, G-43) ──────────────────────────────────────────
@@ -316,7 +324,9 @@ function retirePlayer(
   player.status = reason;
   const effects: Effect[] = [...setOffline(draft, playerId, now)];
   if (socket !== null) {
-    // The phone's socket becomes anonymous; the phone itself goes back to Home.
+    // Confirm to the leaving phone (it keeps its token until this arrives — if the leave or this
+    // reply is lost, its reconnect gets LEFT). The socket becomes anonymous; the phone goes Home.
+    effects.push(send(socket, { type: 'leftGame' }));
     const connection = draft.connections[socket];
     if (connection) delete connection.playerId;
     effects.push(unbind(socket));
@@ -345,7 +355,11 @@ export function handleReclaim(
   if (target?.status !== 'active' || target.connId !== null || alreadyRequested)
     return [errorTo(connId, 'RECLAIM_UNAVAILABLE', 'reclaim')];
   // The requester's token must be new to this game (it becomes the player's on approval).
-  if (findPlayerByToken(draft, msg.tokenHash) || findReclaimByToken(draft, msg.tokenHash))
+  if (
+    findPlayerByToken(draft, msg.tokenHash) ||
+    findPlayerByPreviousToken(draft, msg.tokenHash) ||
+    findReclaimByToken(draft, msg.tokenHash)
+  )
     return [errorTo(connId, 'NOT_ALLOWED', 'reclaim')];
   const name = validateNickname(msg.nickname);
   if (!name.ok) return [errorTo(connId, 'INVALID_NICKNAME', 'reclaim')];
@@ -401,6 +415,9 @@ export function handleAnswerReclaim(
   if (!msg.approve || target?.status !== 'active' || target.connId !== null)
     return denyReclaim(draft, msg.requestId);
 
+  // The old phone's token stops resuming the player, but is remembered so that phone hears
+  // RECLAIMED ("continued on another phone") rather than "Game not found".
+  target.previousTokenHashes.push(target.tokenHash);
   target.tokenHash = request.requesterTokenHash;
   request.status = 'approved';
   const effects: Effect[] = [toHost({ type: 'reclaimClosed', requestId: msg.requestId })];
@@ -415,12 +432,23 @@ export function handleAnswerReclaim(
 
 // ── Sockets ─────────────────────────────────────────────────────────────────
 
-/** Socket opened: register it as anonymous until it identifies itself with hello / reclaim. */
+/**
+ * Socket opened: register it as anonymous until it identifies itself with hello / reclaim.
+ * The protocol version comes from the WebSocket URL (`/ws/KEY?v=N`, CLAUDE.md §4) — the ONE place
+ * it is checked for a new socket. A mismatched phone is told why and closed, never registered.
+ */
 export function onConnectionOpened(
   draft: GameState,
   event: Extract<EngineEvent, { kind: 'connectionOpened' }>,
   _ctx: Ctx,
 ): Effect[] {
+  const mismatch = protocolMismatch(event.protocolVersion);
+  if (mismatch !== null) {
+    return [
+      errorTo(event.connId, mismatch),
+      close(event.connId, WS_CLOSE.PROTOCOL_MISMATCH, mismatch),
+    ];
+  }
   draft.connections[event.connId] ??= { protocolVersion: event.protocolVersion };
   return [];
 }
@@ -565,18 +593,26 @@ function attachAsPlayer(
   connId: ConnId,
   now: number,
 ): Effect[] {
-  const effects: Effect[] = [];
+  const replaced: Effect[] = [];
   const previous = draft.players[playerId]?.connId ?? null;
   if (previous !== null && previous !== connId) {
-    effects.push(
+    replaced.push(
       send(previous, { type: 'error', code: 'REPLACED' }),
       close(previous, WS_CLOSE.REPLACED, 'replaced'),
     );
   }
-  effects.push(...setOnline(draft, playerId, connId, now), bindToPlayer(connId, playerId));
+  // All state changes first; then the welcome (built from the result) goes out BEFORE any delta
+  // this socket would also receive — "welcome first" (CLAUDE.md §5, checked in test/game/helpers).
+  // Coming back online also auto-denies a pending "That's me" for this player (G-44, in setOnline).
+  const deltas = setOnline(draft, playerId, connId, now);
   cancelHandoverIfHostOnline(draft);
-  effects.push(...fillVacantHost(draft, playerId), welcome(draft, playerId, connId, now));
-  return effects;
+  deltas.push(...fillVacantHost(draft, playerId));
+  return [
+    ...replaced,
+    bindToPlayer(connId, playerId),
+    welcome(draft, playerId, connId, now),
+    ...deltas,
+  ];
 }
 
 function welcome(draft: GameState, playerId: PlayerId, connId: ConnId, now: number): Effect {
@@ -601,6 +637,16 @@ function findPlayerByToken(
   tokenHash: string,
 ): [PlayerId, PlayerState] | undefined {
   return entriesOf(state.players).find(([, player]) => player.tokenHash === tokenHash);
+}
+
+/** A player this token USED to belong to, before an approved "That's me" (G-44). */
+function findPlayerByPreviousToken(
+  state: GameState,
+  tokenHash: string,
+): [PlayerId, PlayerState] | undefined {
+  return entriesOf(state.players).find(([, player]) =>
+    player.previousTokenHashes.includes(tokenHash),
+  );
 }
 
 function findReclaimByToken(

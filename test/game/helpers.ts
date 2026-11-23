@@ -10,7 +10,12 @@ import { applyEvent } from '../../src/game/engine';
 import { checkInvariants, checkSnapshotInvariants } from '../../src/game/invariants';
 import { GameStateSchema, type GameState } from '../../src/game/stateSchema';
 import type { Ctx, Effect, EngineEvent, EngineResult } from '../../src/game/types';
-import { ServerMessageSchema, type ServerMessage } from '../../src/shared/protocol';
+import {
+  ServerMessageSchema,
+  type ConnId,
+  type PlayerId,
+  type ServerMessage,
+} from '../../src/shared/protocol';
 
 /** Every message an effect would put on the wire. */
 export function outgoingMessages(effects: readonly Effect[]): ServerMessage[] {
@@ -37,10 +42,48 @@ export function expectValidMessage(message: ServerMessage): void {
     expect(checkSnapshotInvariants(message.snapshot), 'snapshot invariants').toEqual([]);
 }
 
+/**
+ * "Welcome first" (CLAUDE.md §5): a socket that gets a `welcome` in this event must not receive a
+ * broadcast or a host message BEFORE it — a phone can't apply a delta to a snapshot it doesn't
+ * have yet. Direct sends (reclaimResult before the welcome, …) are deliberate and allowed.
+ * Recipients are worked out from the resulting state, as the DO would deliver them.
+ */
+export function welcomeFirstViolations(state: GameState, effects: readonly Effect[]): string[] {
+  const welcomeAt = new Map<ConnId, number>();
+  effects.forEach((effect, i) => {
+    if (
+      effect.kind === 'send' &&
+      effect.message.type === 'welcome' &&
+      !welcomeAt.has(effect.connId)
+    )
+      welcomeAt.set(effect.connId, i);
+  });
+  const reaches = (effect: Effect, connId: ConnId): boolean => {
+    if (effect.kind === 'broadcast')
+      return Object.entries(state.players).some(
+        ([id, p]) =>
+          p.status === 'active' &&
+          p.connId === connId &&
+          !(effect.except ?? []).includes(id as PlayerId),
+      );
+    if (effect.kind === 'sendToHost')
+      return state.hostId !== null && state.players[state.hostId]?.connId === connId;
+    return false;
+  };
+  const problems: string[] = [];
+  effects.forEach((effect, i) => {
+    for (const [connId, at] of welcomeAt)
+      if (i < at && reaches(effect, connId))
+        problems.push(`${connId} receives ${effect.kind} #${i} before its welcome #${at}`);
+  });
+  return problems;
+}
+
 /** applyEvent + every check above. Use this instead of applyEvent in game tests. */
 export function apply(state: GameState, event: EngineEvent, ctx: Ctx): EngineResult {
   const result = applyEvent(state, event, ctx);
   expectValidState(result.state);
   for (const message of outgoingMessages(result.effects)) expectValidMessage(message);
+  expect(welcomeFirstViolations(result.state, result.effects), 'welcome first').toEqual([]);
   return result;
 }

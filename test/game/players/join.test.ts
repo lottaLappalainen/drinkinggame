@@ -91,7 +91,6 @@ describe('joining as a new player', () => {
     game.open(conn('x'));
     const effects = game.send(conn('x'), {
       type: 'hello',
-      protocolVersion: PROTOCOL_VERSION,
       tokenHash: fakeTokenHash(2),
       gameId: gameId('OldGame00001'),
     });
@@ -196,21 +195,28 @@ describe('resuming & one socket per player (G-16, G-18)', () => {
     expect(game.effects).toEqual([]);
   });
 
-  it('a phone on another protocol version is told to reload / wait, and closed (CLAUDE.md §4)', () => {
+  it('a socket opened with another protocol version is told to reload / wait, closed, never registered (CLAUDE.md §4)', () => {
     for (const [version, code] of [
-      [PROTOCOL_VERSION - 1, 'OUTDATED_CLIENT'],
+      [PROTOCOL_VERSION - 1, 'OUTDATED_CLIENT'], // incl. 0 = no / unreadable ?v= in the URL
       [PROTOCOL_VERSION + 1, 'SERVER_UPDATING'],
     ] as const) {
-      if (version < 1) continue; // no older protocol exists yet
       const game = session(lobbyState());
-      game.open(conn('x'));
-      const effects = game.send(conn('x'), {
-        type: 'hello',
+      const effects = game.event({
+        kind: 'connectionOpened',
+        connId: conn('x'),
         protocolVersion: version,
-        tokenHash: fakeTokenHash(2),
       });
-      expect(sentTo(effects, conn('x'))).toEqual([{ type: 'error', code, for: 'hello' }]);
+      expect(sentTo(effects, conn('x'))).toEqual([{ type: 'error', code }]);
       expect(closed(effects)).toEqual([conn('x')]);
+      expect(game.state.connections[conn('x')]).toBeUndefined();
+      // Its messages are refused (the DO stops forwarding anyway once it's closed).
+      expect(game.send(conn('x'), { type: 'hello', tokenHash: fakeTokenHash(2) })).toEqual([
+        {
+          kind: 'send',
+          connId: conn('x'),
+          message: { type: 'error', code: 'NOT_ALLOWED', for: 'hello' },
+        },
+      ]);
     }
   });
 });
