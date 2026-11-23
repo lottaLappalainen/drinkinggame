@@ -2,6 +2,7 @@
 // not just documented.
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
+import jsxA11y from 'eslint-plugin-jsx-a11y';
 import reactHooks from 'eslint-plugin-react-hooks';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -154,8 +155,10 @@ export default tseslint.config(
   {
     files: ['src/client/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
-    plugins: { 'react-hooks': reactHooks },
+    plugins: { 'react-hooks': reactHooks, 'jsx-a11y': jsxA11y },
     rules: {
+      // Accessibility rules (the plugin's recommended set) — phones, small tap targets, party use.
+      ...jsxA11y.flatConfigs.recommended.rules,
       // Only these two: the v7 "recommended" set adds React-Compiler rules that assume React.
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'error',
