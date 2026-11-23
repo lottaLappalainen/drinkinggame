@@ -68,8 +68,16 @@ export const RECONNECT_MAX_MS = 5_000;
 export const OUTDATED_RELOAD_MIN_INTERVAL_MS = 60_000; // at most one automatic reload per minute
 
 // ── Limits on input ─────────────────────────────────────────────────────────
-export const MAX_MESSAGE_BYTES = 4_096; // incoming WebSocket message
+export const MAX_MESSAGE_BYTES = 4_096; // incoming WebSocket message / create-game body (UTF-8 bytes)
 export const MAX_PHOTO_BYTES = 65_536; // uploaded profile photo
+/**
+ * Sockets that are neither a player nor a "That's me" requester (a tab left on the join screen).
+ * They live in the saved state and survive the liveness check as long as they ping, so they are
+ * capped per game; one more is closed at once (TOO_MANY_CONNECTIONS).
+ */
+export const MAX_ANONYMOUS_CONNECTIONS = 50;
+/** Random game keys tried by POST /api/games before giving up with CREATE_FAILED. */
+export const CREATE_GAME_ATTEMPTS = 5;
 export const PHOTO_SIZE_PX = 192; // photos are cropped/resized to this square on the phone
 
 // ── WebSocket close codes (4000–4999 are free for applications) ─────────────
@@ -87,4 +95,6 @@ export const WS_CLOSE = {
    * it: browsers hide a failed upgrade's status, so the phone couldn't tell it from a network drop.
    */
   NOT_FOUND: 4005,
+  /** Too many sockets that never said who they are (MAX_ANONYMOUS_CONNECTIONS). */
+  TOO_MANY_CONNECTIONS: 4006,
 } as const;
