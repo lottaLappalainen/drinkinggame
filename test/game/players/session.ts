@@ -10,7 +10,7 @@ import { fakeTokenHash } from '../../fixtures/states';
 import { apply } from '../helpers';
 
 /** Deterministic random source (a small LCG) — ids differ between calls but repeat between runs. */
-function seeded(seed: number): () => number {
+export function seeded(seed: number): () => number {
   let x = seed % 2147483647 || 1;
   return () => {
     x = (x * 48271) % 2147483647;

@@ -73,6 +73,8 @@ export function checkInvariants(state: GameState): string[] {
   if ((phase === 'ENDED') !== (state.endReason !== null))
     fail(`endReason ${String(state.endReason)} does not fit phase ${phase}`);
   if (phase === 'LOBBY' && round !== null) fail('LOBBY with a round');
+  // A finished game keeps no round: the answers are private and have no use any more (3B).
+  if (phase === 'ENDED' && round !== null) fail('ENDED with a round (answers must be dropped)');
   if (phase === 'LOBBY' && state.questions.length > 0) fail('LOBBY with drawn questions');
   if (phase === 'QUESTION' && (round === null || round.results !== null))
     fail('QUESTION needs a round without results');
@@ -129,6 +131,9 @@ function checkRound(state: GameState, round: RoundState): string[] {
   if (round.candidates.length < 1 || round.candidates.length > MAX_CANDIDATES)
     fail(`${round.candidates.length} candidates (allowed 1…MAX_CANDIDATES)`);
   if (new Set(round.candidates).size !== round.candidates.length) fail('duplicate candidate');
+  // Everyone ranked is also someone who answers (candidates are chosen from the participants, G-34).
+  for (const id of round.candidates)
+    if (!round.participants.includes(id)) fail(`candidate ${id} is not a participant`);
   for (const id of [...round.candidates, ...round.participants])
     if (!isPlayer(id)) fail(`round refers to unknown player ${id}`);
   if (!(round.startedAt <= round.answerStartsAt && round.answerStartsAt < round.endsAt))

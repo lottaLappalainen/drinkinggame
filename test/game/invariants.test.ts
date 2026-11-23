@@ -50,6 +50,22 @@ describe('checkInvariants catches', () => {
       },
     ],
     [
+      'a candidate who is not a participant of the round',
+      questionState,
+      (s) => {
+        if (s.round) s.round.participants = s.round.participants.filter((id) => id !== P.ville);
+      },
+    ],
+    [
+      'an ended game that still holds a round (its answers)',
+      questionState,
+      (s) => {
+        s.phase = 'ENDED';
+        s.endReason = 'finished';
+        s.deadlines = { retention: 1 };
+      },
+    ],
+    [
       'a host who is not active',
       lobbyState,
       (s) => {

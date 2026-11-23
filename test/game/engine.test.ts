@@ -1,9 +1,8 @@
-// Engine routing and the checks common to every message. Game rules themselves are Phase 3;
-// reaching a handler stub shows up as a NotImplementedError naming the owning phase.
+// Engine routing and the checks common to every message. The game rules themselves are tested
+// next to their handlers (test/game/players, test/game/rounds, test/game/scoring).
 import { describe, expect, it } from 'vitest';
 import { MESSAGE_RULES, applyEvent } from '../../src/game/engine';
 import { newPlayerId, randomId } from '../../src/game/ids';
-import { NotImplementedError } from '../../src/game/notImplemented';
 import type { Ctx, EngineClientMessage, EngineEvent } from '../../src/game/types';
 import type { ClientMessageType, ConnId } from '../../src/shared/protocol';
 import { C, P, T0, connId } from '../fixtures/common';
@@ -124,28 +123,24 @@ describe('late or repeated round actions are ignored silently (G-39)', () => {
 });
 
 describe('routing reaches the right handler', () => {
-  const expectStub = (fn: () => unknown, owner: string) => {
-    expect(fn).toThrow(NotImplementedError);
-    expect(fn).toThrow(owner);
-  };
+  const effectTypes = (effects: readonly { kind: string; message?: { type: string } }[]) =>
+    effects.flatMap((e) => (e.message ? [e.message.type] : []));
 
-  it('host start → rounds (3B)', () => {
-    expectStub(
-      () => applyEvent(lobbyState(), message(C.mikko, { type: 'start' }), ctx),
-      'Phase 3B',
-    );
+  it('host start → rounds (3B): the first round starts', () => {
+    const result = apply(lobbyState(), message(C.mikko, { type: 'start' }), ctx);
+    expect(result.state.phase).toBe('QUESTION');
+    expect(effectTypes(result.effects)).toEqual(['roundStarted']);
   });
 
-  it('submit for the current round → rounds (3B)', () => {
-    expectStub(
-      () =>
-        applyEvent(
-          questionState(),
-          message(C.aino, { type: 'submit', roundId: 1, ranking: [P.mikko] }),
-          ctx,
-        ),
-      'Phase 3B',
+  it('submit for the current round → rounds (3B): everyone is told who is ready', () => {
+    const state = questionState();
+    const candidates = state.round?.candidates ?? [];
+    const result = apply(
+      state,
+      message(C.mikko, { type: 'submit', roundId: 1, ranking: [...candidates] }),
+      ctx,
     );
+    expect(effectTypes(result.effects)).toEqual(['playerReady']);
   });
 
   it('3A messages and events reach the players handlers (behaviour: test/game/players)', () => {
@@ -161,10 +156,12 @@ describe('routing reaches the right handler', () => {
     expect(photo.state.players[P.aino]?.avatar.photoVersion).toBe(1);
   });
 
-  it('closing a round is still the 3B stub (reached via the round-end deadline)', () => {
+  it('the round-end deadline closes the round and sends the results', () => {
     const state = questionState();
     const due = state.deadlines.roundEnd ?? 0;
-    expectStub(() => applyEvent(state, { kind: 'deadline' }, { ...ctx, now: due }), 'closeRound');
+    const result = apply(state, { kind: 'deadline' }, { ...ctx, now: due });
+    expect(result.state.phase).toBe('RESULTS');
+    expect(effectTypes(result.effects)).toEqual(['roundResults']);
   });
 });
 
@@ -172,11 +169,7 @@ describe('the engine never mutates its input', () => {
   it('state is deep-copied before handlers run', () => {
     const state = lobbyState();
     const before = JSON.stringify(state);
-    try {
-      applyEvent(state, message(C.mikko, { type: 'start' }), ctx);
-    } catch {
-      // stub throws — irrelevant here
-    }
+    applyEvent(state, message(C.mikko, { type: 'start' }), ctx);
     expect(JSON.stringify(state)).toBe(before);
   });
 });

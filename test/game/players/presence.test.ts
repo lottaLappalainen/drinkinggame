@@ -168,12 +168,14 @@ describe('rebuild after a load (CLAUDE.md §3/§4)', () => {
     expect(closed(effects)).toEqual([conn('old')]);
   });
 
-  it('a lost socket of the last unanswered player ends the round — via the normal path (3B)', () => {
+  it('a lost socket of the last unanswered player ends the round — and everyone hears the results', () => {
     // Aino answered; Mikko, Ville and Sanna lose their sockets → nobody left to wait for.
     const game = session(questionState(), questionState().round?.answerStartsAt ?? 0);
     const onlyAino = all.filter((s) => s.playerId === P.aino);
-    // Closing the round is Phase 3B (closeRound) — reaching it proves the effects aren't dropped.
-    expect(() => game.event({ kind: 'rebuild', sockets: onlyAino })).toThrow('closeRound');
+    const effects = game.event({ kind: 'rebuild', sockets: onlyAino });
+    expect(game.state.phase).toBe('RESULTS');
+    // One answer is not enough for a group ranking (S-7) — but the round closed and phones are told.
+    expect(only(broadcasts(effects), 'roundResults').results.outcome).toBe('notEnoughAnswers');
   });
 });
 

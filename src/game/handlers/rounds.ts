@@ -1,77 +1,102 @@
-// Round-side game logic — filled by Phase 3B (.claude/phases/phase-3-game-logic.md).
-// Still stubs (Phase 3B): start, submit, advance, end and closeRound. Already implemented (needed by
-// 3A, whose events reach them): onPlayersChanged (pause flag + early-end check) and the round-end
-// deadline routing — both end in closeRound, the 3B stub.
+// Round-side game logic (Phase 3B): Start, answers, Next / Finish, End, the round-end deadline and
+// "who is here" consequences (pause, early round end).
+//
+// This file only decides WHO may do WHAT and WHEN; the transitions live in game/rounds/round.ts,
+// the question draw and candidate choice in game/rounds/, the scoring in game/scoring/.
 //
 // Conventions: MUTATE `draft`, return effects. The engine has already checked sender identity,
-// host-only, phase and stale roundId.
+// host-only, phase and stale roundId (a late or double Submit / Next never gets here).
 import { MIN_PLAYERS } from '../../shared/constants';
-import { canEndEarly, readyCounter } from '../../shared/ready';
-import { broadcast } from '../effects';
-import { keysOf } from '../ids';
-import { NotImplementedError } from '../notImplemented';
+import type { PlayerId } from '../../shared/protocol';
+import { serverAcceptsAdvance } from '../../shared/reveal';
+import { acceptsAnswers } from '../../shared/timeline';
+import { broadcast, errorTo } from '../effects';
 import { activePlayers } from '../players/presence';
-import type { GameState } from '../stateSchema';
+import { drawQuestions } from '../rounds/draw';
+import { closeRound, closeRoundIfEveryoneReady, endGame, startRound } from '../rounds/round';
+import type { GameState, RoundState } from '../stateSchema';
 import type { Ctx, Effect, EngineMessageOf, Sender } from '../types';
 
-const OWNER = 'Phase 3B';
-
 /**
- * Host starts the game from the LOBBY (G-21: ≥ MIN_PLAYERS active). The chosen categories must
- * fill the length (G-23: game/questions poolCanFill, else error NOT_ENOUGH_QUESTIONS and stay in
- * the LOBBY). Draw gameLength distinct questions from questionPool(settings.categories)
- * (Fisher–Yates with ctx.random, uniform over the pool, G-31), store them WITH text, category and
- * label set in state.questions (the game never reads the bank again), and start round 1.
+ * Host starts the game from the LOBBY. Needs ≥ MIN_PLAYERS active players (G-21) and categories
+ * that can fill the game length (G-23 → NOT_ENOUGH_QUESTIONS, the game stays in the lobby). Draws
+ * the questions (G-22, G-31), then starts round 1.
  */
 export function handleStart(
-  _draft: GameState,
+  draft: GameState,
   _msg: EngineMessageOf<'start'>,
-  _sender: Sender,
-  _ctx: Ctx,
+  sender: Sender,
+  ctx: Ctx,
 ): Effect[] {
-  throw new NotImplementedError(OWNER, 'start (G-21, G-31)');
+  if (activePlayers(draft).length < MIN_PLAYERS)
+    return [errorTo(sender.connId, 'NOT_ALLOWED', 'start')];
+  const questions = drawQuestions(draft.settings.categories, draft.settings.gameLength, ctx.random);
+  if (questions === null) return [errorTo(sender.connId, 'NOT_ENOUGH_QUESTIONS', 'start')];
+  draft.questions = questions;
+  return startRound(draft, ctx, 1);
 }
 
 /**
- * Ranking submitted (G-36, G-37): only in the answer window (shared/timeline acceptsAnswers),
- * only participants, exactly the round's candidates once each, once per player. Broadcast
- * playerReady (G-38). An answer after endsAt + grace that arrives before the alarm has closed the
- * round is IGNORED silently (no error) — like the engine does for submits arriving in RESULTS.
+ * A ranking (G-36, G-37). Silently ignored (a double tap, a slow phone) when this player already
+ * answered or the answer window is over; refused before the window opens, from someone who isn't
+ * taking part (a late joiner, G-19), and when it isn't a ranking of exactly the shown players.
  */
 export function handleSubmit(
-  _draft: GameState,
-  _msg: EngineMessageOf<'submit'>,
-  _sender: Sender,
-  _ctx: Ctx,
+  draft: GameState,
+  msg: EngineMessageOf<'submit'>,
+  sender: Sender,
+  ctx: Ctx,
 ): Effect[] {
-  throw new NotImplementedError(OWNER, 'submit (G-36…G-38)');
+  const round = currentRound(draft);
+  const playerId = senderId(sender);
+  const refuse = (code: 'NOT_ALLOWED' | 'INVALID') => [errorTo(sender.connId, code, 'submit')];
+
+  if (!round.participants.includes(playerId)) return refuse('NOT_ALLOWED');
+  if (!acceptsAnswers(ctx.now, round)) {
+    // Too early is a bug on the phone; too late is just a slow phone (the alarm closes the round).
+    return ctx.now < round.answerStartsAt ? refuse('NOT_ALLOWED') : [];
+  }
+  if (round.answers[playerId] !== undefined) return []; // final: a second tap changes nothing
+  if (!isRankingOf(msg.ranking, round.candidates)) return refuse('INVALID');
+
+  round.answers[playerId] = [...msg.ranking];
+  return [
+    broadcast({ type: 'playerReady', roundId: round.roundId, playerId }),
+    ...closeRoundIfEveryoneReady(draft, ctx),
+  ];
 }
 
 /**
- * Host's Next / Finish (G-45): accepted from revealEndsAt − ADVANCE_EARLY_MS (shared/reveal
- * serverAcceptsAdvance — server only); next round, or ENDED after the last question; blocked
- * while paused except Finish.
+ * The host's Next / Finish (G-45), from the end of the reveal on (with a little clock tolerance;
+ * earlier taps are ignored — the phone only unlocks the button when the reveal is done). After the
+ * last question it ends the game — also while paused. Otherwise the next round starts, unless the
+ * game is paused (G-42): the host's Next works again once enough players are back.
  */
 export function handleAdvance(
-  _draft: GameState,
+  draft: GameState,
   _msg: EngineMessageOf<'advance'>,
-  _sender: Sender,
-  _ctx: Ctx,
+  sender: Sender,
+  ctx: Ctx,
 ): Effect[] {
-  throw new NotImplementedError(OWNER, 'advance (G-45)');
+  const round = currentRound(draft);
+  if (round.results === null) throw new Error('Engine contract broken: advance outside RESULTS');
+  if (!serverAcceptsAdvance(ctx.now, round.results.revealEndsAt)) return [];
+  if (round.index + 1 >= draft.questions.length) return endGame(draft, ctx, 'finished');
+  if (draft.paused) return [errorTo(sender.connId, 'NOT_ALLOWED', 'advance')];
+  return startRound(draft, ctx, round.roundId + 1);
 }
 
-/** Host ends the game from any phase (G-46): ENDED 'hostEnded', retention deadline (G-48). */
+/** Host ends the game from any phase (G-46). */
 export function handleEnd(
-  _draft: GameState,
+  draft: GameState,
   _msg: EngineMessageOf<'end'>,
   _sender: Sender,
-  _ctx: Ctx,
+  ctx: Ctx,
 ): Effect[] {
-  throw new NotImplementedError(OWNER, 'end (G-46)');
+  return endGame(draft, ctx, 'hostEnded');
 }
 
-/** Round-end deadline (endsAt + ANSWER_GRACE_MS): close the round, compute results once (S-1…S-7). */
+/** Round-end deadline (endsAt + ANSWER_GRACE_MS): close the round, compute results once. */
 export function onRoundDeadlines(draft: GameState, ctx: Ctx): Effect[] {
   const due = draft.deadlines.roundEnd;
   if (draft.phase !== 'QUESTION' || due === undefined || due > ctx.now) return [];
@@ -81,23 +106,12 @@ export function onRoundDeadlines(draft: GameState, ctx: Ctx): Effect[] {
 /**
  * Called by the engine after ANY change to who is online or active (including after a rebuild —
  * its effects are sent like any others). The ONLY place for: setting/clearing the pause flag
- * (G-42, counting late joiners waiting for their first round) and ending the round early
- * (shared/ready canEndEarly, G-39).
+ * (G-42, counting late joiners waiting for their first round) and ending the round early because
+ * everyone still being waited for has answered (G-39).
  */
 export function onPlayersChanged(draft: GameState, ctx: Ctx): Effect[] {
   if (draft.phase !== 'QUESTION' && draft.phase !== 'RESULTS') return [];
-  const effects = updatePause(draft);
-  const round = draft.round;
-  if (draft.phase === 'QUESTION' && round !== null) {
-    const counter = readyCounter(
-      round.participants,
-      new Set(keysOf(round.answers)),
-      (id) => draft.players[id]?.connId != null,
-    );
-    if (canEndEarly(ctx.now, round.answerStartsAt, counter))
-      effects.push(...closeRound(draft, ctx));
-  }
-  return effects;
+  return [...updatePause(draft), ...closeRoundIfEveryoneReady(draft, ctx)];
 }
 
 /**
@@ -112,10 +126,26 @@ function updatePause(draft: GameState): Effect[] {
   return [broadcast(shouldPause ? { type: 'paused', needed: MIN_PLAYERS } : { type: 'resumed' })];
 }
 
-/**
- * QUESTION → RESULTS, exactly once: Borda scores, places, reveal steps, stats (S-1…S-7, G-50);
- * sends roundResults. Phase 3B.
- */
-function closeRound(_draft: GameState, _ctx: Ctx): Effect[] {
-  throw new NotImplementedError(OWNER, 'closeRound (S-1…S-7, G-50)');
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/** The running round — the engine guarantees one for round-bound messages. */
+function currentRound(draft: GameState): RoundState {
+  if (draft.round === null)
+    throw new Error('Engine contract broken: round message without a round');
+  return draft.round;
+}
+
+function senderId(sender: Sender): PlayerId {
+  if (sender.playerId === undefined)
+    throw new Error('Engine contract broken: player message without a player');
+  return sender.playerId;
+}
+
+/** Exactly the shown players, each once (G-36). */
+function isRankingOf(ranking: readonly PlayerId[], candidates: readonly PlayerId[]): boolean {
+  return (
+    ranking.length === candidates.length &&
+    new Set(ranking).size === ranking.length &&
+    ranking.every((id) => candidates.includes(id))
+  );
 }
