@@ -129,7 +129,12 @@ export const PublicRoundSchema = v.strictObject({
   ready: v.array(PlayerIdSchema),
 });
 
-export const RevealStepKindSchema = v.picklist(['leastLikely', 'third', 'second', 'mostLikely']);
+/**
+ * Which reveal step this is (G-50), named by POSITION, not by wording: `bottom` = the last place,
+ * `top` = place 1. The words ("Least likely" / "Least", …) depend on the question's label set and
+ * are looked up on the phone (shared/questionLabels.ts `placeLabel`), so these ids fit every set.
+ */
+export const RevealStepKindSchema = v.picklist(['bottom', 'third', 'second', 'top']);
 
 export const RevealStepSchema = v.strictObject({
   kind: RevealStepKindSchema,

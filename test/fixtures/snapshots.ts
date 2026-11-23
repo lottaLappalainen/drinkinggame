@@ -164,10 +164,10 @@ function rankedSix(roundId: number): RankedResults {
       { playerId: P.emma, place: 6 },
     ],
     steps: [
-      { kind: 'leastLikely', place: 6, playerIds: [P.emma], rule: null },
+      { kind: 'bottom', place: 6, playerIds: [P.emma], rule: null },
       // place 3 is absorbed by the tie at 2 ("1, 2, 2, 4") → no separate 3rd step
       { kind: 'second', place: 2, playerIds: [P.aino, P.ville], rule: null },
-      { kind: 'mostLikely', place: 1, playerIds: [P.juho], rule: null },
+      { kind: 'top', place: 1, playerIds: [P.juho], rule: null },
     ],
     // 5 answers ≥ MIN_ANSWERS_FOR_STATS → stats are included (S-6)
     stats: [
@@ -193,9 +193,9 @@ const TIE_FIRST = ranked({
     { playerId: P.ville, place: 4 },
   ],
   steps: [
-    { kind: 'leastLikely', place: 4, playerIds: [P.ville], rule: null },
+    { kind: 'bottom', place: 4, playerIds: [P.ville], rule: null },
     { kind: 'third', place: 3, playerIds: [P.mikko], rule: null },
-    { kind: 'mostLikely', place: 1, playerIds: [P.aino, P.sanna], rule: null },
+    { kind: 'top', place: 1, playerIds: [P.aino, P.sanna], rule: null },
   ],
   stats: null,
 });
@@ -210,9 +210,9 @@ const THREE_CANDIDATES = ranked({
     { playerId: P.aino, place: 3 },
   ],
   steps: [
-    { kind: 'leastLikely', place: 3, playerIds: [P.aino], rule: null },
+    { kind: 'bottom', place: 3, playerIds: [P.aino], rule: null },
     { kind: 'second', place: 2, playerIds: [P.mikko], rule: null },
-    { kind: 'mostLikely', place: 1, playerIds: [P.ville], rule: null },
+    { kind: 'top', place: 1, playerIds: [P.ville], rule: null },
   ],
   stats: null,
 });

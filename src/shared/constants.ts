@@ -21,8 +21,13 @@ export const GAME_KEY_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O, 1
 export const GAME_KEY_LENGTH = 5; // G-11
 
 // ── Questions ───────────────────────────────────────────────────────────────
-/** Players shown per question; all of them if there are fewer (G-34). Tuned during UI design (8 or 10). */
-export const MAX_CANDIDATES = 8;
+// Players shown per question (G-34, decided 2026-11-23): everyone while there are at most
+// SHOW_ALL_UP_TO active players; with more, CANDIDATES_WHEN_MORE picked fairly (G-35). Going from
+// 6 to 7 players therefore drops a question from 6 to 5 candidates — intended.
+export const SHOW_ALL_UP_TO = 6;
+export const CANDIDATES_WHEN_MORE = 5;
+/** The most candidates a question can ever have — what schemas and layouts must handle. */
+export const MAX_CANDIDATES = Math.max(SHOW_ALL_UP_TO, CANDIDATES_WHEN_MORE);
 export const QUESTION_MAX_LENGTH = 120; // characters, so it fits a phone screen (Q-4, unsure)
 export const MIN_QUESTION_BANK_SIZE = 35; // = the longest game (G-32)
 
@@ -77,4 +82,9 @@ export const WS_CLOSE = {
   STALE: 4003,
   /** The phone's protocol version doesn't match the server's. */
   PROTOCOL_MISMATCH: 4004,
+  /**
+   * No game under this key (G-12). Sent after accepting the socket, never as an HTTP 404 before
+   * it: browsers hide a failed upgrade's status, so the phone couldn't tell it from a network drop.
+   */
+  NOT_FOUND: 4005,
 } as const;
