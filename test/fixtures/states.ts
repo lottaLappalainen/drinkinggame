@@ -1,6 +1,7 @@
 // Example saved GameStates (the server-side shape). Validated against GameStateSchema and
 // checkInvariants by a test; Phase 3 tests start from these.
 import { questionPool } from '../../src/game/questions';
+import { hasSubject } from '../../src/shared/questionSubject';
 import {
   createGame,
   createPlayer,
@@ -70,6 +71,7 @@ export function questionState(): GameState {
   const ids = [P.mikko, P.aino, P.ville, P.sanna];
   state.phase = 'QUESTION';
   state.questions = questionPool(state.settings.categories)
+    .filter((q) => !hasSubject(q.text)) // a regular question: no subject in this fixture
     .slice(0, state.settings.gameLength)
     .map((q) => ({ ...q }));
   state.round = {
@@ -83,6 +85,7 @@ export function questionState(): GameState {
     endsAt,
     answers: { [P.aino]: [P.ville, P.mikko, P.sanna, P.aino] },
     results: null,
+    subjectId: null,
   };
   state.deadlines.roundEnd = endsAt + ANSWER_GRACE_MS;
   for (const id of ids) {

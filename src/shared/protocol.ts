@@ -8,6 +8,7 @@
 // round; results without a ranking have no reveal steps) — impossible states don't type-check.
 import * as v from 'valibot';
 import { AVATAR_PRESET_IDS } from './avatars';
+import { DRINK_ACTIONS, MAX_SIPS } from './drinkRules';
 import { ADD_ON_CATEGORY_IDS, CATEGORY_IDS } from './questionCategories';
 import { LABEL_SET_IDS } from './questionLabels';
 import { GAME_MODES } from './spots';
@@ -141,6 +142,11 @@ export const PublicRoundSchema = v.strictObject({
   endsAt: TimestampSchema,
   /** Who has pressed Ready (G-38). */
   ready: v.array(PlayerIdSchema),
+  /**
+   * The player a "[player]" question is about (G-51, Q-10) — the phone puts their name in place of
+   * the token. null for a regular question.
+   */
+  subjectId: v.nullable(PlayerIdSchema),
 });
 
 /**
@@ -150,13 +156,22 @@ export const PublicRoundSchema = v.strictObject({
  */
 export const RevealStepKindSchema = v.picklist(['bottom', 'third', 'second', 'top']);
 
+export const DrinkRuleSchema = v.strictObject({
+  action: v.picklist(DRINK_ACTIONS),
+  sips: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_SIPS)),
+});
+
 export const RevealStepSchema = v.strictObject({
   kind: RevealStepKindSchema,
   /** Shared place of everyone in this step ("1, 1, 3" — S-4). */
   place: v.pipe(v.number(), v.integer(), v.minValue(1)),
   playerIds: v.pipe(v.array(PlayerIdSchema), v.minLength(1)),
-  /** Reserved for the drinking rule (U3) — always null until the rules are decided. */
-  rule: v.null(),
+  /**
+   * The drinking rule announced with this place (D-1…D-9): drawn by the server once, from the range
+   * of this step's kind (shared/drinkRules.ts). null is kept for a possible non-drinking mode; the
+   * current rules always fill it.
+   */
+  rule: v.nullable(DrinkRuleSchema),
 });
 
 export const RankingEntrySchema = v.strictObject({
@@ -503,6 +518,7 @@ export type Question = v.InferOutput<typeof QuestionSchema>;
 export type PublicRound = v.InferOutput<typeof PublicRoundSchema>;
 export type RevealStepKind = v.InferOutput<typeof RevealStepKindSchema>;
 export type RevealStep = v.InferOutput<typeof RevealStepSchema>;
+export type DrinkRule = v.InferOutput<typeof DrinkRuleSchema>;
 export type RankingEntry = v.InferOutput<typeof RankingEntrySchema>;
 export type ResultOutcome = v.InferOutput<typeof ResultOutcomeSchema>;
 export type RoundResults = v.InferOutput<typeof RoundResultsSchema>;

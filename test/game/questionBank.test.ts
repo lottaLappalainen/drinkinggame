@@ -61,6 +61,24 @@ describe('question bank (Q-1…Q-4, G-32)', () => {
   });
 });
 
+describe('questions about a player (Q-10, G-51)', () => {
+  const parses = (text: string) =>
+    v.safeParse(BankQuestionSchema, { id: 'x', text, category: 'default', labels: 'most' }).success;
+
+  it('allows "[player]" once, and no other [...] token', () => {
+    expect(parses('Who is the closest to [player]?')).toBe(true);
+    expect(parses('Who would [player] pick over [player]?')).toBe(false);
+    expect(parses('Who is the closest to [Player]?')).toBe(false); // a typo would show on screen
+    expect(parses('Who is the closest to [name]?')).toBe(false);
+  });
+
+  it('the bank has "[player]" questions, and every one names the token exactly once', () => {
+    const about = QUESTION_BANK.filter((question) => question.text.includes('[player]'));
+    expect(about.length).toBeGreaterThan(0);
+    for (const question of about) expect(question.text.split('[player]')).toHaveLength(2);
+  });
+});
+
 describe('duplicate detection', () => {
   it('treats case, punctuation and spacing differences as duplicates', () => {
     expect(normalizeQuestionText('Who is most likely to sing?')).toBe(

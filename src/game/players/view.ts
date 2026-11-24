@@ -42,6 +42,7 @@ export function publicRound(state: GameState, round: RoundState): PublicRound {
     answerStartsAt: round.answerStartsAt,
     endsAt: round.endsAt,
     ready: keysOf(round.answers),
+    subjectId: round.subjectId,
   };
 }
 

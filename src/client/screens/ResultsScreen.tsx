@@ -3,16 +3,34 @@
 // back mid-reveal jumps to the current one. Places only — never vote counts (S-6). The words come
 // from the question's label set (Q-8); a partial ranking (Podium) has no "least" and a "No votes"
 // group. The host's Next unlocks exactly at revealEndsAt (never the server's early tolerance).
-import type { PlayerId, PublicPlayer, RankedResults, SnapshotOf } from '../../shared/protocol';
-import { MIN_ANSWERS_FOR_RANKING } from '../../shared/constants';
+// Each step announces its drinking rule a beat after the names (D-6); the full ranking keeps the
+// rules next to the revealed places until Next.
+import type {
+  DrinkRule,
+  PlayerId,
+  PublicPlayer,
+  RankedResults,
+  SnapshotOf,
+} from '../../shared/protocol';
+import { MIN_ANSWERS_FOR_RANKING, REVEAL_RULE_DELAY_MS } from '../../shared/constants';
+import { DRINK_RULES } from '../../shared/drinkRules';
 import { NO_VOTES_LABEL, placeLabel } from '../../shared/questionLabels';
-import { nextRevealChangeAt, revealPosition } from '../../shared/reveal';
+import { nextRevealChangeAt, revealPosition, revealStepStartsAt } from '../../shared/reveal';
 import { isPartialRanking } from '../../shared/spots';
 import { STRINGS } from '../strings';
 import { Button } from '../ui/Controls';
 import { Card } from '../ui/Feedback';
-import { Drumroll, PlayerChip, PlayerList, RevealStep, type PhotoSource } from '../ui/Game';
-import { Center, Screen, Spacer, Stack } from '../ui/Layout';
+import {
+  DrinkBadge,
+  DrinkChip,
+  Drumroll,
+  PlayerChip,
+  PlayerList,
+  QuestionText,
+  RevealStep,
+  type PhotoSource,
+} from '../ui/Game';
+import { Center, Row, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
 import { GameMenu, PausedBanner, photoSource, ReclaimPrompts, RoundHeader } from './parts';
@@ -56,12 +74,15 @@ export function ResultsScreen(props: { snapshot: SnapshotOf<'RESULTS'> }) {
     <Screen label={STRINGS.results.revealing}>
       <Stack gap="2">
         <RoundHeader round={round} />
-        <Text variant="question">{round.question.text}</Text>
+        <QuestionText
+          text={round.question.text}
+          subject={snapshot.players.find((p) => p.playerId === round.subjectId)}
+        />
       </Stack>
       <PausedBanner paused={snapshot.paused} />
       <ReclaimPrompts snapshot={snapshot} />
       {results.outcome === 'ranked' ? (
-        <Ranked snapshot={snapshot} results={results} position={position} />
+        <Ranked snapshot={snapshot} results={results} position={position} now={now} />
       ) : (
         <Center grow>
           <Heading level={2} center>
@@ -87,8 +108,10 @@ function Ranked(props: {
   snapshot: SnapshotOf<'RESULTS'>;
   results: RankedResults;
   position: ReturnType<typeof revealPosition>;
+  now: number;
 }) {
   const { snapshot, results, position } = props;
+  const me = snapshot.you.playerId;
   const source = photoSource(snapshot);
   const labels = snapshot.round.question.labels;
   const partial = isPartialRanking(snapshot.round.spots, snapshot.round.candidates.length);
@@ -115,6 +138,12 @@ function Ranked(props: {
     case 'step': {
       const step = results.steps[position.index];
       if (step === undefined) return null;
+      // The rule shows a beat after the names, timed from the server's step start (D-6).
+      const stepStartsAt = revealStepStartsAt(
+        results.revealStartsAt,
+        results.steps.length,
+        position.index,
+      );
       return (
         <Center grow>
           <RevealStep
@@ -123,6 +152,16 @@ function Ranked(props: {
             players={players(step.playerIds)}
             source={source}
             top={step.kind === 'top'}
+            rule={
+              step.rule === null
+                ? undefined
+                : {
+                    kind: step.kind,
+                    rule: step.rule,
+                    appearInMs: stepStartsAt + REVEAL_RULE_DELAY_MS - props.now,
+                  }
+            }
+            you={step.playerIds.includes(me)}
           />
         </Center>
       );
@@ -144,7 +183,13 @@ function Ranked(props: {
   }
 }
 
-/** After the reveal: everyone with a place, then (Podium) the "No votes" group. */
+/** Long past: a badge shown without its entrance or roll (the full ranking's "you" line). */
+const SETTLED_MS = -60_000;
+
+/**
+ * After the reveal: everyone with a place (revealed places keep their drinking rule, D-6), then
+ * (Podium) the "No votes" group. If the viewer has a rule, it's repeated on top.
+ */
 function FullRanking(props: {
   results: RankedResults;
   labelOf: (place: number) => string;
@@ -158,12 +203,28 @@ function FullRanking(props: {
     props.players([entry.playerId]).map((player) => ({ player, place: entry.place })),
   );
   const noVotes = results.noVotes === null ? [] : props.players(results.noVotes);
+  // Who has which rule: everyone in a reveal step (middle places and "No votes" have none, D-4).
+  const rules = new Map<PlayerId, DrinkRule>();
+  const myStep = results.steps.find((step) => step.playerIds.includes(props.me));
+  for (const step of results.steps)
+    if (step.rule !== null) for (const id of step.playerIds) rules.set(id, step.rule);
   return (
     <Stack gap="3">
+      {myStep?.rule != null && (
+        <Center>
+          <DrinkBadge
+            rule={myStep.rule}
+            range={DRINK_RULES[myStep.kind]}
+            appearInMs={SETTLED_MS}
+            you
+          />
+        </Center>
+      )}
       <Heading level={2}>{STRINGS.results.fullRanking}</Heading>
       <PlayerList
         label={STRINGS.results.fullRanking}
         items={ranked.map(({ player, place }) => {
+          const rule = rules.get(player.playerId);
           return {
             key: player.playerId,
             content: (
@@ -171,7 +232,12 @@ function FullRanking(props: {
                 player={player}
                 source={props.source}
                 isYou={player.playerId === props.me}
-                meta={<Text variant="small">{`${String(place)}. ${props.labelOf(place)}`}</Text>}
+                meta={
+                  <Row gap="2">
+                    <Text variant="small">{`${String(place)}. ${props.labelOf(place)}`}</Text>
+                    {rule !== undefined && <DrinkChip rule={rule} />}
+                  </Row>
+                }
               />
             ),
           };

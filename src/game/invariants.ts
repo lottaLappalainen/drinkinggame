@@ -11,8 +11,11 @@ import {
   MIN_ANSWERS_FOR_NO_VOTES_LIST,
   MIN_ANSWERS_FOR_RANKING,
   MIN_PLAYERS,
+  SUBJECT_MIN_RANKABLE,
 } from '../shared/constants';
+import { DRINK_RULES, inRange } from '../shared/drinkRules';
 import type { PlayerId, RoundResults, Snapshot } from '../shared/protocol';
+import { hasSubject } from '../shared/questionSubject';
 import { gameCategories, type CategoryId } from '../shared/questionCategories';
 import { revealEndsAt } from '../shared/reveal';
 import { isPartialRanking, spotsFor } from '../shared/spots';
@@ -147,6 +150,19 @@ function checkRound(state: GameState, round: RoundState): string[] {
   if (round.index >= state.questions.length) fail(`round.index ${round.index} has no question`);
   // One round per question, in order: round N shows question N (index N − 1).
   if (round.roundId !== round.index + 1) fail('round.roundId must be round.index + 1');
+  // "[player]" questions (G-51): a subject exactly when the question has the token; the subject
+  // takes part and is ranked only in the few-players fallback.
+  const question = state.questions[round.index];
+  if (question !== undefined && hasSubject(question.text) !== (round.subjectId !== null))
+    fail('round.subjectId must be set exactly for a "[player]" question (G-51)');
+  if (round.subjectId !== null) {
+    if (!round.participants.includes(round.subjectId)) fail('the subject is not a participant');
+    if (
+      round.candidates.includes(round.subjectId) &&
+      round.participants.length >= SUBJECT_MIN_RANKABLE
+    )
+      fail('the subject is ranked although enough players could be (G-51)');
+  }
   // Candidates stay rankable for their round even if they leave meanwhile (G-41) → they must
   // exist, but needn't be active.
   // Spotlight shows at most MAX_CANDIDATES; Podium shows every participant (G-34, G-24).
@@ -217,9 +233,15 @@ function checkResults(
         fail('a full ranking has a "No votes" group');
       if (partial && results.steps.some((step) => step.kind === 'bottom'))
         fail('a partial ranking reveals a bottom step (G-50)');
-      for (const step of results.steps)
+      for (const step of results.steps) {
         for (const id of step.playerIds)
           if (!ranked.includes(id)) fail(`reveal step names unranked player ${id}`);
+        // D-1: the rule is the one of the step's kind, with a number from its range.
+        const range = DRINK_RULES[step.kind];
+        if (step.rule === null) fail(`reveal step ${step.kind} has no drinking rule (D-1)`);
+        else if (step.rule.action !== range.action || !inRange(range, step.rule.sips))
+          fail(`reveal step ${step.kind} has a rule outside its range (D-1)`);
+      }
       break;
     }
     case 'notEnoughAnswers':
@@ -261,6 +283,10 @@ export function checkSnapshotInvariants(snapshot: Snapshot): string[] {
       fail(`question from a category that wasn't chosen (G-22)`);
     if (round.spots !== spotsFor(snapshot.settings.mode, round.candidates.length))
       fail('round.spots does not match the mode (G-24)');
+    if (hasSubject(round.question.text) !== (round.subjectId !== null))
+      fail('subjectId must be set exactly for a "[player]" question (G-51)');
+    if (round.subjectId !== null && !ids.has(round.subjectId))
+      fail('the subject is not in the player list');
   }
   if (snapshot.phase === 'RESULTS') {
     if (snapshot.results.roundId !== snapshot.round.roundId)

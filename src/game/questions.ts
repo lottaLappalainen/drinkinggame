@@ -11,6 +11,7 @@ import {
   type CategoryId,
 } from '../shared/questionCategories';
 import { DEFAULT_LABEL_SET, labelMismatch } from '../shared/questionLabels';
+import { SUBJECT_TOKEN, bracketTokens } from '../shared/questionSubject';
 import rawBank from '../questions/questions.json';
 
 /**
@@ -19,7 +20,16 @@ import rawBank from '../questions/questions.json';
  */
 export const BankQuestionSchema = v.strictObject({
   id: v.pipe(v.string(), v.minLength(1)),
-  text: v.pipe(v.string(), v.minLength(1), v.maxLength(QUESTION_MAX_LENGTH)),
+  text: v.pipe(
+    v.string(),
+    v.minLength(1),
+    v.maxLength(QUESTION_MAX_LENGTH),
+    // Q-10: "[player]" at most once, and no other [...] token (a typo would show up on screen).
+    v.check((text) => {
+      const tokens = bracketTokens(text);
+      return tokens.length === 0 || (tokens.length === 1 && tokens[0] === SUBJECT_TOKEN);
+    }, `Only one "${SUBJECT_TOKEN}" and no other [...] tokens are allowed (Q-10)`),
+  ),
   category: CategoryIdSchema,
   labels: v.optional(LabelSetIdSchema, DEFAULT_LABEL_SET),
 });

@@ -141,6 +141,15 @@
   animation-play-state: paused;
 }
 
+/* The seconds under the board: same digit widths, so the line doesn't wobble as it counts. */
+.secondsLeft {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--color-text);
+}
+
 @keyframes drain {
   from {
     transform: scaleX(1);
@@ -198,6 +207,97 @@
   max-width: var(--avatar-xl);
   font-weight: var(--font-weight-bold);
   overflow-wrap: anywhere;
+}
+
+/* ── Drinking rules (D-6) ── */
+.rule {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-heavy);
+  line-height: var(--line-height-tight);
+  animation: rule-in var(--dur-slow) var(--ease-spring) var(--rule-delay) both;
+}
+
+.ruleDrink {
+  background: var(--rule-drink-bg);
+  color: var(--rule-drink-fg);
+}
+
+.ruleGive {
+  background: var(--rule-give-bg);
+  color: var(--rule-give-fg);
+}
+
+/* The viewer has to drink / give: ringed, like the "most likely" card. */
+.ruleYou {
+  outline: var(--focus-ring-width) solid var(--color-indicator-strong);
+  outline-offset: var(--focus-ring-width);
+}
+
+.ruleWords {
+  white-space: nowrap;
+}
+
+/* The number rolls through the rule's range and lands on the drawn one (transform only). */
+.roll {
+  display: inline-block;
+  height: var(--roll-line);
+  overflow: hidden;
+  font-size: var(--font-size-2xl);
+  line-height: var(--roll-line);
+}
+
+.rollStrip {
+  display: flex;
+  flex-direction: column;
+  transform: translateY(calc(var(--roll-end) * var(--roll-line) * -1));
+  animation: roll var(--dur-roll) var(--ease-out) var(--rule-delay) both;
+}
+
+.rollNumber {
+  height: var(--roll-line);
+  text-align: center;
+}
+
+.ruleChip {
+  display: inline-block;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  white-space: nowrap;
+}
+
+@keyframes rule-in {
+  from {
+    opacity: 0;
+    transform: scale(var(--pop-scale));
+  }
+}
+
+@keyframes roll {
+  from {
+    transform: translateY(0);
+  }
+}
+
+/* ── "[player]" questions (G-51) ── */
+.questionWithSubject {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.subject {
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--subject-bg);
+  color: var(--subject-fg);
 }
 
 @keyframes enter-gentle {

@@ -1,15 +1,26 @@
-// Game pieces (CLAUDE.md §7): Avatar, PlayerChip, PlayerList, Countdown, ReadyList, RevealStep.
+// Game pieces (CLAUDE.md §7): Avatar, PlayerChip, PlayerList, Countdown, ReadyList, RevealStep,
+// DrinkBadge / DrinkChip (drinking rules, D-6), QuestionText ("[player]" questions, G-51).
 // (QrCode lives in its own file: its library is loaded lazily, lobby only.)
 import type { ComponentChildren } from 'preact';
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { AVATAR_PRESETS, getAvatarPreset, type PresetId } from '../../shared/avatars';
-import type { GameId, GameKey, PlayerId, PublicPlayer } from '../../shared/protocol';
+import { DRINK_RULES, type DrinkRange } from '../../shared/drinkRules';
+import type {
+  DrinkRule,
+  GameId,
+  GameKey,
+  PlayerId,
+  PublicPlayer,
+  RevealStepKind,
+} from '../../shared/protocol';
+import { questionParts } from '../../shared/questionSubject';
 import { readyCounter } from '../../shared/ready';
 import { STRINGS } from '../strings';
 import { cx } from './cx';
 import { Badge } from './Feedback';
 import styles from './Game.module.css';
 import { useFlip } from './motion';
+import { Text } from './Text';
 
 // ── Avatar ───────────────────────────────────────────────────────────────────
 
@@ -189,6 +200,39 @@ export function Countdown(props: {
   );
 }
 
+/**
+ * The answer time as words ("23 seconds left"), for the bottom of the question screen. Re-renders
+ * once per whole second only (one timer to the next boundary, never per frame). `now` is the
+ * server time at the parent's render; between parent renders it moves on with the phone's clock.
+ */
+export function SecondsLeft(props: { endsAt: number; now: number; frozen?: boolean }) {
+  const clock = useRef({ base: props.now, at: Date.now() });
+  if (clock.current.base !== props.now) clock.current = { base: props.now, at: Date.now() };
+  const [, setTick] = useState(0);
+  const now =
+    props.frozen === true ? props.now : clock.current.base + (Date.now() - clock.current.at);
+  const remaining = Math.max(0, props.endsAt - now);
+  const left = Math.ceil(remaining / 1000);
+  useEffect(() => {
+    if (props.frozen === true || remaining <= 0) return;
+    // Just past the next whole-second boundary, so the number is never a second behind.
+    const id = window.setTimeout(
+      () => {
+        setTick((n) => n + 1);
+      },
+      (remaining % 1000 || 1000) + 15,
+    );
+    return () => {
+      window.clearTimeout(id);
+    };
+  });
+  return (
+    <p class={styles.secondsLeft} role="timer">
+      {STRINGS.round.secondsLeft(left)}
+    </p>
+  );
+}
+
 // ── Ready list (G-38) ────────────────────────────────────────────────────────
 
 export function readyCountOf(
@@ -245,13 +289,20 @@ export function ReadyList(props: {
 
 // ── Reveal step (G-50) ───────────────────────────────────────────────────────
 
-/** One reveal step: the place's words and everyone at that place (ties together, S-4). */
+/**
+ * One reveal step: the place's words, everyone at that place (ties together, S-4), then the
+ * drinking rule (D-6) a beat after the names.
+ */
 export function RevealStep(props: {
   label: string;
   players: readonly PublicPlayer[];
   source?: PhotoSource | undefined;
   /** The final "most likely" moment gets the biggest entrance. */
   top?: boolean;
+  /** The rule and its step kind (for the roll range); omitted = no rule shown. */
+  rule?: { kind: RevealStepKind; rule: DrinkRule; appearInMs: number } | undefined;
+  /** The viewer is in this step: "You drink 5 sips". */
+  you?: boolean;
 }) {
   return (
     <section class={cx(styles.reveal, props.top === true && styles.revealTop)} aria-live="polite">
@@ -268,7 +319,142 @@ export function RevealStep(props: {
           </div>
         ))}
       </div>
+      {props.rule !== undefined && (
+        <DrinkBadge
+          rule={props.rule.rule}
+          range={DRINK_RULES[props.rule.kind]}
+          appearInMs={props.rule.appearInMs}
+          shared={props.players.length > 1}
+          you={props.you === true}
+        />
+      )}
     </section>
+  );
+}
+
+// ── Drinking rules (D-6) ─────────────────────────────────────────────────────
+
+const RULE_EMOJI = { drink: '🍺', give: '👉' } as const;
+/** At least this many numbers flick past before the drawn one lands. */
+const ROLL_MIN_NUMBERS = 8;
+
+/**
+ * The numbers the roll shows: the rule's range over and over, ending on the drawn number — the
+ * same on every phone, so they all land on it together.
+ */
+export function rollNumbers(range: DrinkRange, sips: number): number[] {
+  const span = range.max - range.min + 1;
+  const count = Math.max(ROLL_MIN_NUMBERS, span);
+  return [...Array.from({ length: count }, (_, i) => range.min + (i % span)), sips];
+}
+
+/**
+ * "🍺 Drink 5 sips": appears `appearInMs` from now (the server timeline decides when — a phone
+ * that comes back mid-step gets a negative value and shows the badge at once), then its number
+ * rolls through the rule's range and lands on the drawn one. Both are CSS animations with a delay
+ * captured ONCE (a delay recomputed on re-render would restart them — see Countdown).
+ */
+export function DrinkBadge(props: {
+  rule: DrinkRule;
+  range: DrinkRange;
+  appearInMs?: number;
+  /** Several players share the place: "each" (D-3). */
+  shared?: boolean;
+  you?: boolean;
+}) {
+  const { rule } = props;
+  const delay = useRef(props.appearInMs ?? 0).current;
+  const numbers = rollNumbers(props.range, rule.sips);
+  const you = props.you === true;
+  useEffect(() => {
+    // A short buzz on the phone that has to drink / give, as the badge lands (where supported).
+    if (!you || delay < 0 || typeof navigator.vibrate !== 'function') return;
+    const timer = setTimeout(() => navigator.vibrate(40), delay);
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [you, delay]);
+  const sentence = STRINGS.drinks.sentence(rule.action, rule.sips, you);
+  return (
+    <div
+      class={cx(
+        styles.rule,
+        rule.action === 'drink' ? styles.ruleDrink : styles.ruleGive,
+        you && styles.ruleYou,
+      )}
+      role="status"
+      aria-label={props.shared === true ? `${sentence} ${STRINGS.drinks.each}` : sentence}
+      // eslint-disable-next-line no-restricted-syntax -- runtime timing + roll length, as CSS variables only (CLAUDE.md §7 allows this)
+      style={{ '--rule-delay': `${String(delay)}ms`, '--roll-end': String(numbers.length - 1) }}
+    >
+      <span aria-hidden="true">{RULE_EMOJI[rule.action]}</span>
+      <span class={styles.ruleWords} aria-hidden="true">
+        {STRINGS.drinks.words(rule.action, you)}
+      </span>
+      <span class={styles.roll} aria-hidden="true">
+        <span class={styles.rollStrip}>
+          {numbers.map((n, i) => (
+            <span key={i} class={styles.rollNumber}>
+              {n}
+            </span>
+          ))}
+        </span>
+      </span>
+      <span class={styles.ruleWords} aria-hidden="true">
+        {STRINGS.drinks.sips(rule.sips)}
+        {props.shared === true && ` ${STRINGS.drinks.each}`}
+      </span>
+    </div>
+  );
+}
+
+/** Compact rule next to a place in the full ranking: "🍺 drinks 5". */
+export function DrinkChip(props: { rule: DrinkRule }) {
+  const { rule } = props;
+  return (
+    <span class={cx(styles.ruleChip, rule.action === 'drink' ? styles.ruleDrink : styles.ruleGive)}>
+      {`${RULE_EMOJI[rule.action]} ${STRINGS.drinks.chip(rule.action, rule.sips)}`}
+    </span>
+  );
+}
+
+// ── Question text (G-51) ─────────────────────────────────────────────────────
+
+/**
+ * A question, with the subject's name highlighted in place of "[player]" (G-51) — as plain text,
+ * never HTML. The intro (`large`) also shows the subject's picture, so everyone sees at a glance
+ * who it's about.
+ */
+export function QuestionText(props: {
+  text: string;
+  subject: PublicPlayer | null | undefined;
+  large?: boolean;
+  center?: boolean;
+  source?: PhotoSource | undefined;
+}) {
+  const variant = props.large === true ? 'questionLarge' : 'question';
+  const center = props.center === true;
+  const parts = questionParts(props.text);
+  if (parts === null)
+    return (
+      <Text variant={variant} center={center}>
+        {props.text}
+      </Text>
+    );
+  const name = props.subject?.nickname ?? STRINGS.round.someone;
+  const text = (
+    <Text variant={variant} center={center}>
+      {parts.before}
+      <mark class={styles.subject}>{name}</mark>
+      {parts.after}
+    </Text>
+  );
+  if (props.large !== true || props.subject == null) return text;
+  return (
+    <div class={styles.questionWithSubject}>
+      <PlayerAvatar player={props.subject} source={props.source} size="lg" />
+      {text}
+    </div>
   );
 }
 

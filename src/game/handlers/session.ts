@@ -160,6 +160,8 @@ function joinAsNewPlayer(
     // A late joiner starts level with the least-shown player, so fair selection (G-35) doesn't
     // pick them for every question until they "catch up".
     timesShown: leastShown(draft), // computed before this player is added
+    // Same for "[player]" questions (G-51): a newcomer isn't the subject of every next one.
+    timesSubject: leastSubject(draft),
   };
   draft.players[playerId] = player;
   setOnline(draft, playerId, connId, ctx.now); // a join is announced as playerJoined instead
@@ -174,6 +176,11 @@ function joinAsNewPlayer(
     ]),
     ...hostEffects,
   ];
+}
+
+function leastSubject(draft: GameState): number {
+  const counts = activePlayers(draft).map(([, player]) => player.timesSubject);
+  return counts.length === 0 ? 0 : Math.min(...counts);
 }
 
 function leastShown(draft: GameState): number {

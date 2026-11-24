@@ -57,13 +57,18 @@ export const PlayerStateSchema = v.strictObject({
   activeFromRound: v.pipe(v.number(), v.integer(), v.minValue(1)),
   /** How often shown as a candidate — fair selection (G-35). */
   timesShown: Count,
+  /** How often a "[player]" question was about this player — fair choice (G-51). */
+  timesSubject: Count,
   status: PlayerStatusSchema,
-  /** Reserved for the drinking rules and the Game Over summary (U3); kept up to date by 3B. */
+  /** For the Game Over summary (§5.4). Saved state only — never sent to phones (S-6). */
   stats: v.strictObject({
     timesFirst: Count,
     timesLast: Count,
     answered: Count,
     missed: Count,
+    /** Sips from the drinking rules (D-9): drunk at a place, given out at place 1. */
+    sipsDrunk: Count,
+    sipsGiven: Count,
   }),
 });
 
@@ -99,6 +104,8 @@ export const RoundStateSchema = v.strictObject({
   answers: v.record(PlayerIdSchema, v.array(PlayerIdSchema)),
   /** Computed exactly once at QUESTION → RESULTS. Carries revealStartsAt / revealEndsAt. */
   results: v.nullable(RoundResultsSchema),
+  /** The player a "[player]" question is about (G-51); null for a regular question. */
+  subjectId: v.nullable(PlayerIdSchema),
 });
 
 export const GameStateSchema = v.strictObject({
@@ -161,8 +168,9 @@ export function createPlayer(input: NewPlayerInput): PlayerState {
     offlineSince: input.now,
     activeFromRound: input.activeFromRound,
     timesShown: 0,
+    timesSubject: 0,
     status: 'active',
-    stats: { timesFirst: 0, timesLast: 0, answered: 0, missed: 0 },
+    stats: { timesFirst: 0, timesLast: 0, answered: 0, missed: 0, sipsDrunk: 0, sipsGiven: 0 },
   };
 }
 

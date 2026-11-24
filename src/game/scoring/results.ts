@@ -18,6 +18,7 @@ import type { PlayerId, RoundResults } from '../../shared/protocol';
 import { revealEndsAt as revealEnd } from '../../shared/reveal';
 import { isPartialRanking } from '../../shared/spots';
 import { bordaPoints, placesFromPoints, type Vote } from './borda';
+import { withDrinkRules } from './drinks';
 import { revealSteps } from './revealSteps';
 
 export type ResultsInput = {
@@ -29,6 +30,8 @@ export type ResultsInput = {
   readonly answers: Readonly<Record<string, readonly PlayerId[]>>;
   /** The moment the round closes; the reveal starts REVEAL_BUFFER_MS later so every phone has it. */
   readonly now: number;
+  /** The game's random source (ctx.random) — draws the drinking rules' numbers (D-2). */
+  readonly random: () => number;
 };
 
 export function computeResults(input: ResultsInput): RoundResults {
@@ -50,7 +53,7 @@ export function computeResults(input: ResultsInput): RoundResults {
   // In a full ranking every vote gives every candidate ≥ 1 point, so `placed` is everyone.
   const placed = input.candidates.filter(hasPoints);
   const ranking = placesFromPoints(placed, points);
-  const steps = revealSteps(ranking, !partial);
+  const steps = withDrinkRules(revealSteps(ranking, !partial), input.random);
   const withhold = partial && answerCount < MIN_ANSWERS_FOR_NO_VOTES_LIST;
   const revealed = new Set(steps.flatMap((step) => step.playerIds));
   return {

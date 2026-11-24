@@ -163,7 +163,14 @@ describe('results (S-1…S-7)', () => {
   const answersOf = (votes: readonly (readonly PlayerId[])[]) =>
     Object.fromEntries(votes.map((vote, i) => [`voter${i}`, vote]));
   const results = (votes: readonly (readonly PlayerId[])[]) =>
-    computeResults({ roundId: 3, candidates, spots: 4, answers: answersOf(votes), now: T0 });
+    computeResults({
+      roundId: 3,
+      candidates,
+      spots: 4,
+      answers: answersOf(votes),
+      now: T0,
+      random: () => 0,
+    });
 
   it('nobody answered (S-5): nothing to reveal', () => {
     expect(results([])).toEqual({
@@ -231,6 +238,7 @@ describe('Podium results (G-24, S-8, G-50)', () => {
       spots: Math.min(3, candidates.length),
       answers: Object.fromEntries(votes.map((vote, i) => [`voter${String(i)}`, vote])),
       now: T0,
+      random: () => 0,
     });
   const FIVE_VOTES = [
     [A, B, C],
@@ -293,6 +301,7 @@ describe('Podium results (G-24, S-8, G-50)', () => {
       spots: 3,
       answers: Object.fromEntries(votes.map((vote, i) => [`voter${String(i)}`, vote])),
       now: T0,
+      random: () => 0,
     });
     expect(asPodium).toEqual(asSpotlight);
     if (asPodium.outcome !== 'ranked') throw new Error('expected a ranking');

@@ -58,6 +58,9 @@ const TEXT: readonly [string, string][] = [
   ['--color-link', '--color-surface'],
   ['--color-on-primary', '--color-primary'],
   ['--color-on-secondary', '--color-secondary'],
+  ['--rule-drink-fg', '--rule-drink-bg'],
+  ['--rule-give-fg', '--rule-give-bg'],
+  ['--subject-fg', '--subject-bg'],
   ['--color-on-accent', '--color-accent'],
   ['--color-on-danger', '--color-danger'],
   ['--color-danger-text', '--color-surface'], // field errors

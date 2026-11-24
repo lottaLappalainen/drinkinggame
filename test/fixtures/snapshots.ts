@@ -84,6 +84,7 @@ function round(overrides: Partial<PublicRound> = {}): PublicRound {
     answerStartsAt,
     endsAt: answerStartsAt + ROUND_MS,
     ready: [],
+    subjectId: null,
   };
   const merged = { ...base, ...overrides };
   return { ...merged, spots: overrides.spots ?? merged.candidates.length };
@@ -165,10 +166,15 @@ function rankedSix(roundId: number): RankedResults {
       { playerId: P.emma, place: 6 },
     ],
     steps: [
-      { kind: 'bottom', place: 6, playerIds: [P.emma], rule: null },
+      { kind: 'bottom', place: 6, playerIds: [P.emma], rule: { action: 'drink', sips: 5 } },
       // place 3 is absorbed by the tie at 2 ("1, 2, 2, 4") → no separate 3rd step
-      { kind: 'second', place: 2, playerIds: [P.aino, P.ville], rule: null },
-      { kind: 'top', place: 1, playerIds: [P.juho], rule: null },
+      {
+        kind: 'second',
+        place: 2,
+        playerIds: [P.aino, P.ville],
+        rule: { action: 'drink', sips: 3 },
+      },
+      { kind: 'top', place: 1, playerIds: [P.juho], rule: { action: 'give', sips: 7 } },
     ],
     // A full ranking: everyone is placed, so nobody is in the "No votes" group.
     noVotes: [],
@@ -187,9 +193,9 @@ const TIE_FIRST = ranked({
     { playerId: P.ville, place: 4 },
   ],
   steps: [
-    { kind: 'bottom', place: 4, playerIds: [P.ville], rule: null },
-    { kind: 'third', place: 3, playerIds: [P.mikko], rule: null },
-    { kind: 'top', place: 1, playerIds: [P.aino, P.sanna], rule: null },
+    { kind: 'bottom', place: 4, playerIds: [P.ville], rule: { action: 'drink', sips: 5 } },
+    { kind: 'third', place: 3, playerIds: [P.mikko], rule: { action: 'drink', sips: 2 } },
+    { kind: 'top', place: 1, playerIds: [P.aino, P.sanna], rule: { action: 'give', sips: 7 } },
   ],
   noVotes: [],
 });
@@ -204,9 +210,9 @@ const THREE_CANDIDATES = ranked({
     { playerId: P.aino, place: 3 },
   ],
   steps: [
-    { kind: 'bottom', place: 3, playerIds: [P.aino], rule: null },
-    { kind: 'second', place: 2, playerIds: [P.mikko], rule: null },
-    { kind: 'top', place: 1, playerIds: [P.ville], rule: null },
+    { kind: 'bottom', place: 3, playerIds: [P.aino], rule: { action: 'drink', sips: 5 } },
+    { kind: 'second', place: 2, playerIds: [P.mikko], rule: { action: 'drink', sips: 3 } },
+    { kind: 'top', place: 1, playerIds: [P.ville], rule: { action: 'give', sips: 7 } },
   ],
   noVotes: [],
 });
@@ -245,9 +251,14 @@ const PODIUM_RANKED = ranked({
   ],
   noVotes: [P.mikko, P.emma, guestId(8), guestId(9), guestId(10), guestId(11), guestId(12)],
   steps: [
-    { kind: 'third', place: 3, playerIds: [P.ville, guestId(7)], rule: null },
-    { kind: 'second', place: 2, playerIds: [P.aino], rule: null },
-    { kind: 'top', place: 1, playerIds: [P.juho], rule: null },
+    {
+      kind: 'third',
+      place: 3,
+      playerIds: [P.ville, guestId(7)],
+      rule: { action: 'drink', sips: 2 },
+    },
+    { kind: 'second', place: 2, playerIds: [P.aino], rule: { action: 'drink', sips: 3 } },
+    { kind: 'top', place: 1, playerIds: [P.juho], rule: { action: 'give', sips: 7 } },
   ],
 });
 
@@ -262,10 +273,28 @@ const PODIUM_WITHHELD = ranked({
     { playerId: guestId(9), place: 1 },
   ],
   noVotes: null,
-  steps: [{ kind: 'top', place: 1, playerIds: [P.juho, P.aino, guestId(9)], rule: null }],
+  steps: [
+    {
+      kind: 'top',
+      place: 1,
+      playerIds: [P.juho, P.aino, guestId(9)],
+      rule: { action: 'give', sips: 7 },
+    },
+  ],
 });
 
 const RANKED_SNAPSHOT = resultsSnapshot(RANKED);
+// A question about Emma (G-51): she answers, but isn't on the list to rank.
+const SUBJECT_ROUND: Partial<PublicRound> = {
+  question: {
+    id: 'q0290',
+    text: 'Who is the closest to [player]?',
+    category: 'default',
+    labels: 'most',
+  },
+  candidates: [P.mikko, P.aino, P.ville, P.sanna, P.juho],
+  subjectId: P.emma,
+};
 const stepAt = (i: number) => revealStepStartsAt(REVEAL_STARTS_AT, RANKED.steps.length, i);
 const AINO_WAITING = { playerId: P.aino, submitted: false };
 
@@ -282,7 +311,7 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'lobby-two-players',
-    screen: '3 Lobby — Start disabled (< 3 active, G-21)',
+    screen: '3 Lobby: Start disabled (< 3 active, G-21)',
     now: T0,
     snapshot: lobby({
       players: [player(P.mikko, 'Mikko'), player(P.aino, 'Aino', { avatar: preset('cat') })],
@@ -290,7 +319,7 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'lobby-reclaim-pending',
-    screen: '3 Lobby — host sees a "That\'s me" request (G-44)',
+    screen: '3 Lobby: host sees a "That\'s me" request (G-44)',
     now: T0,
     snapshot: lobby({
       reclaims: [
@@ -307,13 +336,13 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'lobby-host-vacant',
-    screen: '3 Lobby — host role vacant (host left, nobody else online)',
+    screen: '3 Lobby: host role vacant (host left, nobody else online)',
     now: T0,
     snapshot: lobby({ hostId: null, you: { playerId: P.aino } }),
   },
   {
     name: 'lobby-add-ons',
-    screen: '3 Lobby — Spicy and Luuppi both on (G-22)',
+    screen: '3 Lobby: Spicy and Luuppi both on (G-22)',
     now: T0,
     snapshot: lobby({
       settings: { gameLength: 35, categories: ['spicy', 'luuppi'], mode: 'spotlight' },
@@ -321,14 +350,14 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'lobby-podium',
-    screen: '3 Lobby — 12 players, Podium chosen (G-24: the switch is enabled from 7 players)',
+    screen: '3 Lobby: 12 players, Podium chosen (G-24: the switch is enabled from 7 players)',
     now: T0,
     snapshot: lobby({ players: manyPlayers(12), settings: PODIUM_SETTINGS }),
   },
   {
     name: 'lobby-podium-start-blocked',
     screen:
-      '3 Lobby — Podium chosen, then players left: 6 < 7, Start disabled with the reason (G-24)',
+      '3 Lobby: Podium chosen, then players left: 6 < 7, Start disabled with the reason (G-24)',
     now: T0,
     snapshot: lobby({ settings: PODIUM_SETTINGS }),
   },
@@ -341,14 +370,26 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
     snapshot: question({}, AINO_WAITING),
   },
   {
+    name: 'question-intro-subject',
+    screen: '4a Question intro: a question about a player, name + picture (G-51)',
+    now: ROUND_STARTED_AT + 1_000,
+    snapshot: question(SUBJECT_ROUND, AINO_WAITING),
+  },
+  {
+    name: 'question-answering-subject',
+    screen: '4b Answering a question about Emma: she is not on the list (G-51)',
+    now: ANSWERING_AT,
+    snapshot: question(SUBJECT_ROUND, AINO_WAITING),
+  },
+  {
     name: 'question-answering',
-    screen: '4b Answering — ranking + timer (G-36)',
+    screen: '4b Answering: ranking + timer (G-36)',
     now: ANSWERING_AT,
     snapshot: question({ ready: [P.ville, P.juho] }, AINO_WAITING),
   },
   {
     name: 'question-answering-most-labels',
-    screen: '4b Answering — a "the most" question: spots say Most / Least (Q-8)',
+    screen: '4b Answering: a "the most" question: spots say Most / Least (Q-8)',
     now: ANSWERING_AT,
     snapshot: question(
       {
@@ -365,7 +406,7 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   {
     name: 'question-podium-25',
     screen:
-      '4b Answering — Podium with 25 players: 3 spots above a pick list of everyone (G-24, G-36)',
+      '4b Answering: Podium with 25 players: 3 spots above a pick list of everyone (G-24, G-36)',
     now: ANSWERING_AT,
     snapshot: {
       ...common({ players: manyPlayers(25), settings: PODIUM_SETTINGS }),
@@ -377,13 +418,13 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'question-answering-last-seconds',
-    screen: '4b Answering — last seconds (countdown pulse)',
+    screen: '4b Answering: last seconds (countdown pulse)',
     now: DEFAULT_ROUND.endsAt - 3_000,
     snapshot: question({ ready: [P.mikko, P.ville, P.sanna, P.juho] }, AINO_WAITING),
   },
   {
     name: 'question-waiting',
-    screen: '4c Waiting — live ready list, Emma offline (G-38)',
+    screen: '4c Waiting: live ready list, Emma offline (G-38)',
     now: ANSWERING_AT + 4_000,
     snapshot: question({ ready: [P.aino, P.ville, P.juho] }, { playerId: P.aino, submitted: true }),
   },
@@ -410,7 +451,7 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'question-paused',
-    screen: '4 Round finishing while paused — too few players for the next one (G-42)',
+    screen: '4 Round finishing while paused: too few players for the next one (G-42)',
     now: ANSWERING_AT,
     snapshot: question({ ready: [P.mikko] }, AINO_WAITING, {
       paused: true,
@@ -440,6 +481,12 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
     snapshot: RANKED_SNAPSHOT,
   },
   {
+    name: 'results-step-you-drink',
+    screen: '5 Reveal step, on the phone of the one who drinks: "You drink 5 sips" (D-6)',
+    now: stepAt(0) + 2_000,
+    snapshot: resultsSnapshot(RANKED, {}, { you: { playerId: P.emma } }),
+  },
+  {
     name: 'results-drumroll',
     screen: '5 Drumroll before MOST LIKELY',
     now: stepAt(2) - REVEAL_DRUMROLL_MS / 2,
@@ -453,7 +500,7 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'results-done-host',
-    screen: '5 Full ranking + stats (≥ 5 answers), host sees Next',
+    screen: '5 Full ranking: revealed places keep their drinking rule, host sees Next (D-6)',
     now: RANKED.revealEndsAt + 1_000,
     snapshot: RANKED_SNAPSHOT,
   },
@@ -465,7 +512,7 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'results-tie-first',
-    screen: '5 Tie for MOST LIKELY, no stats (< 5 answers)',
+    screen: '5 Tie for MOST LIKELY: both give out the same number (D-3)',
     now: TIE_FIRST.revealEndsAt + 1_000,
     snapshot: resultsSnapshot(TIE_FIRST, {
       candidates: [P.mikko, P.aino, P.ville, P.sanna],
@@ -522,7 +569,7 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   // Pause (G-42)
   {
     name: 'paused-results',
-    screen: 'Paused — waiting for players (need 3)',
+    screen: 'Paused: waiting for players (need 3)',
     now: RANKED.revealEndsAt + 1_000,
     snapshot: resultsSnapshot(
       RANKED,
@@ -539,13 +586,13 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   // 6. Game over
   {
     name: 'ended-finished',
-    screen: '6 Game over — all questions played',
+    screen: '6 Game over: all questions played',
     now: T0 + 3_600_000,
     snapshot: ended('finished', P.mikko),
   },
   {
     name: 'ended-host-ended',
-    screen: '6 Game over — host ended the game',
+    screen: '6 Game over: host ended the game',
     now: T0 + 600_000,
     snapshot: ended('hostEnded', P.aino),
   },

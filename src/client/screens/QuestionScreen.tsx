@@ -11,7 +11,7 @@ import { dragStartFor, isComplete, type Placement } from '../ranking/gesture';
 import { RankingBoard } from '../ranking/RankingBoard';
 import { STRINGS } from '../strings';
 import { Button } from '../ui/Controls';
-import { Countdown, ReadyList, readyCountOf } from '../ui/Game';
+import { Countdown, QuestionText, ReadyList, readyCountOf, SecondsLeft } from '../ui/Game';
 import { Center, Dock, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
@@ -30,6 +30,7 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
   // The snapshot always lists its own viewer (checkSnapshotInvariants).
   if (mine === undefined) throw new Error('the snapshot does not list its viewer');
   const watching = isWaitingForNextRound(me, mine.status, round);
+  const subject = snapshot.players.find((p) => p.playerId === round.subjectId);
   const counter = readyCountOf(round, snapshot.players);
 
   if (step === 'intro')
@@ -37,9 +38,7 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
       <Screen center label={STRINGS.round.number(round.number, round.total)}>
         <RoundHeader round={round} />
         <Center grow>
-          <Text variant="questionLarge" center>
-            {round.question.text}
-          </Text>
+          <QuestionText text={round.question.text} subject={subject} source={source} large center />
         </Center>
         <PausedBanner paused={snapshot.paused} />
         <ReclaimPrompts snapshot={snapshot} />
@@ -60,17 +59,20 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
       {STRINGS.round.readyCount(counter.ready, counter.total)}
     </Text>
   );
+  // The time once more at the bottom, in numbers (the bar stays at the top).
+  const secondsLine = <SecondsLeft endsAt={round.endsAt} now={now} frozen={env.frozen} />;
 
   if (step === 'answering' && !watching)
     return (
       <Screen label={STRINGS.round.number(round.number, round.total)}>
         <Stack gap="2">
           <RoundHeader round={round} />
-          <Text variant="question">{round.question.text}</Text>
+          <QuestionText text={round.question.text} subject={subject} />
           {countdown}
         </Stack>
         <Answer key={round.roundId} snapshot={snapshot} />
         {readyLine}
+        {secondsLine}
         <PausedBanner paused={snapshot.paused} />
         <ReclaimPrompts snapshot={snapshot} />
         <GameMenu snapshot={snapshot} />
@@ -82,7 +84,7 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
     <Screen label={STRINGS.round.number(round.number, round.total)}>
       <Stack gap="2">
         <RoundHeader round={round} />
-        <Text variant="question">{round.question.text}</Text>
+        <QuestionText text={round.question.text} subject={subject} />
         {step === 'closed' ? <Text variant="muted">{STRINGS.round.timeUp}</Text> : countdown}
       </Stack>
       {watching ? (
@@ -102,6 +104,7 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
       />
       <PausedBanner paused={snapshot.paused} />
       <ReclaimPrompts snapshot={snapshot} />
+      {step !== 'closed' && secondsLine}
       <Spacer />
       <GameMenu snapshot={snapshot} />
     </Screen>

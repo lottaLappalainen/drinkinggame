@@ -27,7 +27,19 @@ import { errorOutcome } from '../store/errors';
 import { STRINGS } from '../strings';
 import { Button, IconButton, SegmentedControl, TextInput, Toggle } from '../ui/Controls';
 import { Badge, Banner, Card, Spinner, StatusStrip, Toast } from '../ui/Feedback';
-import { Avatar, Countdown, Drumroll, PlayerChip, ReadyList, RevealStep } from '../ui/Game';
+import {
+  Avatar,
+  Countdown,
+  DrinkBadge,
+  DrinkChip,
+  Drumroll,
+  PlayerChip,
+  QuestionText,
+  ReadyList,
+  RevealStep,
+  SecondsLeft,
+} from '../ui/Game';
+import { DRINK_RULES } from '../../shared/drinkRules';
 import { Dock, Row, Stack } from '../ui/Layout';
 import { PhotoPicker } from '../ui/PhotoPicker';
 import { QrCode } from '../ui/QrCode';
@@ -230,11 +242,40 @@ function Components() {
       <Section title="Countdown (frozen at 60 % and in the last seconds)">
         <Countdown startsAt={T0} endsAt={T0 + 30_000} now={T0 + 18_000} frozen />
         <Countdown startsAt={T0} endsAt={T0 + 30_000} now={T0 + 27_000} frozen />
+        <SecondsLeft endsAt={T0 + 30_000} now={T0 + 18_000} frozen />
       </Section>
-      <Section title="Reveal">
-        <RevealStep label="Least likely" players={SIX.slice(5)} />
-        <RevealStep label="Most likely" players={SIX.slice(0, 2)} top />
+      <Section title="Reveal (with the drinking rule a beat after the names)">
+        <RevealStep
+          label="Least likely"
+          players={SIX.slice(5)}
+          rule={{ kind: 'bottom', rule: { action: 'drink', sips: 5 }, appearInMs: 700 }}
+        />
+        <RevealStep
+          label="Most likely"
+          players={SIX.slice(0, 2)}
+          top
+          rule={{ kind: 'top', rule: { action: 'give', sips: 7 }, appearInMs: 700 }}
+        />
         <Drumroll />
+      </Section>
+      <Section title="Drinking rules (drink / give out / 1 sip / shared / you / chips)">
+        <Row wrap>
+          <DrinkBadge rule={{ action: 'drink', sips: 6 }} range={DRINK_RULES.bottom} />
+          <DrinkBadge rule={{ action: 'give', sips: 10 }} range={DRINK_RULES.top} />
+          <DrinkBadge rule={{ action: 'drink', sips: 1 }} range={DRINK_RULES.third} />
+          <DrinkBadge rule={{ action: 'drink', sips: 3 }} range={DRINK_RULES.second} shared />
+          <DrinkBadge rule={{ action: 'drink', sips: 4 }} range={DRINK_RULES.second} you />
+          <DrinkBadge rule={{ action: 'give', sips: 2 }} range={DRINK_RULES.top} you />
+        </Row>
+        <Row wrap>
+          <DrinkChip rule={{ action: 'drink', sips: 5 }} />
+          <DrinkChip rule={{ action: 'give', sips: 7 }} />
+        </Row>
+      </Section>
+      <Section title='Question about a player ("[player]", G-51)'>
+        <QuestionText text="Who is the closest to [player]?" subject={SIX[1]} large center />
+        <QuestionText text="Who is [player] most likely to kiss?" subject={SIX[2]} />
+        <QuestionText text="Who is the funniest?" subject={null} />
       </Section>
       <Section title="Ranking board: Spotlight (drag or tap; full test page: /dev/ranking)">
         <RankingBoard

@@ -4,9 +4,9 @@
 
 // ── Versions ────────────────────────────────────────────────────────────────
 /** Bump on any change to the saved GameState shape (CLAUDE.md §4 "State version + schema"). */
-export const STATE_VERSION = 2;
+export const STATE_VERSION = 3;
 /** Bump on any incompatible wire-protocol change (CLAUDE.md §4 "Deploys and protocol changes"). */
-export const PROTOCOL_VERSION = 2;
+export const PROTOCOL_VERSION = 3;
 
 // ── Players ─────────────────────────────────────────────────────────────────
 export const MAX_PLAYERS = 25; // active players per game (G-13)
@@ -41,6 +41,11 @@ export const PODIUM_MIN_PLAYERS = 7;
 export const QUESTION_MAX_LENGTH = 120; // characters, so it fits a phone screen (Q-4, unsure)
 /** Questions the always-on Default category must have: the longest game (G-23, G-32). */
 export const MIN_QUESTION_BANK_SIZE = 35;
+/**
+ * A "[player]" question leaves its player off the list to rank (G-51). With fewer rankable players
+ * than this, only 2 would be left — the question then swaps with the next regular one.
+ */
+export const SUBJECT_MIN_RANKABLE = 4;
 
 // ── Round timeline (all milliseconds) ───────────────────────────────────────
 export const QUESTION_INTRO_MS = 4_000; // question-only screen before answering (G-49, unsure)
@@ -50,7 +55,9 @@ export const ROUND_MS = ROUND_SECONDS * 1_000;
 export const ANSWER_GRACE_MS = 500;
 /** Results are sent slightly before the reveal starts, so every phone has them in time. */
 export const REVEAL_BUFFER_MS = 300;
-export const REVEAL_STEP_MS = 2_500; // one reveal step (G-50, unsure)
+export const REVEAL_STEP_MS = 3_500; // one reveal step: names, then the drinking rule (G-50, D-6, unsure)
+/** Within a reveal step, the drinking rule appears this long after the names (D-6). */
+export const REVEAL_RULE_DELAY_MS = 700;
 export const REVEAL_DRUMROLL_MS = 1_500; // extra pause before "most likely" (G-50)
 /** The host's Next is accepted this long before revealEndsAt (clock drift tolerance, G-45). */
 export const ADVANCE_EARLY_MS = 500;

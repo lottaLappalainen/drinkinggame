@@ -39,6 +39,16 @@
   /* Non-text indicators need ≥ 3:1 against what's next to them (WCAG 1.4.11) */
   --color-indicator: #981b5d; /* timer bar, selected spot */
   --color-indicator-strong: #612593; /* "most likely" ring */
+
+  /* Drinking-rule badges (D-6): drink = berry, give out = purple (it sits on the gold "most likely" card) */
+  --rule-drink-bg: var(--color-primary);
+  --rule-drink-fg: var(--color-on-primary);
+  --rule-give-bg: var(--color-secondary);
+  --rule-give-fg: var(--color-on-secondary);
+
+  /* The player's name inside a "[player]" question (G-51) */
+  --subject-bg: var(--color-accent);
+  --subject-fg: var(--color-on-accent);
   --color-focus-ring: #612593;
   --color-slot-border: #7a6470; /* empty ranking spots, toggle tracks */
 
@@ -124,6 +134,8 @@
   --dur-slow: 400ms;
   --dur-reveal: 700ms;
   --dur-pulse: 1s;
+  --dur-roll: 600ms; /* the drinking rule's number roll (D-6) */
+  --roll-line: 1.1em; /* one number's height in the roll strip */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --pop-scale: 0.6;
@@ -176,6 +188,7 @@
     --dur-base: 1ms;
     --dur-slow: 1ms;
     --dur-reveal: 1ms;
+    --dur-roll: 1ms;
     --pop-scale: 1;
     --press-scale: 1;
     --lift-distance: 0;
