@@ -82,6 +82,11 @@ export const PONG_MESSAGE = 'pong';
 export const TIME_SYNC_SAMPLES = 5; // clock-offset samples after each (re)connect
 export const RECONNECT_MIN_MS = 250;
 export const RECONNECT_MAX_MS = 5_000;
+/**
+ * Screen back on while the socket still looks open (iOS keeps dead sockets): ping, and reconnect if
+ * no pong arrives this soon — instead of waiting up to CLIENT_PING_MS for the next heartbeat.
+ */
+export const VISIBLE_PONG_TIMEOUT_MS = 3_000;
 export const OUTDATED_RELOAD_MIN_INTERVAL_MS = 60_000; // at most one automatic reload per minute
 
 // ── Limits on input ─────────────────────────────────────────────────────────
