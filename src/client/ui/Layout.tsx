@@ -116,3 +116,11 @@ export function Spacer() {
 export function Center(props: { children: ComponentChildren; grow?: boolean }) {
   return <div class={cx(styles.center, props.grow === true && styles.grow)}>{props.children}</div>;
 }
+
+/**
+ * Keeps its content (a screen's main action) pinned to the bottom of the screen while the page
+ * scrolls — e.g. Ready under a long Podium list. In normal flow when everything fits.
+ */
+export function Dock(props: { children: ComponentChildren }) {
+  return <div class={styles.dock}>{props.children}</div>;
+}

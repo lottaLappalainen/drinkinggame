@@ -7,11 +7,12 @@ import { placeLabel } from '../../shared/questionLabels';
 import { isWaitingForNextRound } from '../../shared/ready';
 import { isPartialRanking } from '../../shared/spots';
 import { nextRoundStepAt, roundStep } from '../../shared/timeline';
-import { isComplete, RankingBoard, type Placement } from '../ranking/RankingBoard';
+import { dragStartFor, isComplete, type Placement } from '../ranking/gesture';
+import { RankingBoard } from '../ranking/RankingBoard';
 import { STRINGS } from '../strings';
 import { Button } from '../ui/Controls';
 import { Countdown, ReadyList, readyCountOf } from '../ui/Game';
-import { Center, Screen, Spacer, Stack } from '../ui/Layout';
+import { Center, Dock, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
 import { GameMenu, PausedBanner, photoSource, ReclaimPrompts, RoundHeader } from './parts';
@@ -107,7 +108,7 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
   );
 }
 
-/** The ranking (interim tap board until 5B) + Ready (G-36, G-37). */
+/** The ranking board (drag or tap) + Ready (G-36, G-37). */
 function Answer(props: { snapshot: SnapshotOf<'QUESTION'> }) {
   const env = useEnv();
   const { round } = props.snapshot;
@@ -130,10 +131,14 @@ function Answer(props: { snapshot: SnapshotOf<'QUESTION'> }) {
 
   return (
     <Stack gap="4">
-      <Text variant="small" center>
-        {partial ? STRINGS.round.placeTop(round.spots) : STRINGS.round.placeAll} —{' '}
-        {STRINGS.round.tapToPlace}
-      </Text>
+      <Stack gap="1" align="center">
+        <Text variant="label" center>
+          {partial ? STRINGS.round.placeTop(round.spots) : STRINGS.round.placeAll}
+        </Text>
+        <Text variant="small" center>
+          {STRINGS.ranking.howTo[dragStartFor(candidates.length)]}
+        </Text>
+      </Stack>
       <RankingBoard
         candidates={candidates}
         spots={round.spots}
@@ -143,18 +148,21 @@ function Answer(props: { snapshot: SnapshotOf<'QUESTION'> }) {
         source={photoSource(props.snapshot)}
         disabled={sending}
       />
-      <Button
-        size="lg"
-        block
-        variant="accent"
-        disabled={!isComplete(placement)}
-        busy={sending}
-        onClick={() => {
-          if (isComplete(placement)) env.actions.submit(placement);
-        }}
-      >
-        {STRINGS.round.ready}
-      </Button>
+      {/* Pinned to the bottom: with a long Podium list, Ready must not hide below it. */}
+      <Dock>
+        <Button
+          size="lg"
+          block
+          variant="accent"
+          disabled={!isComplete(placement)}
+          busy={sending}
+          onClick={() => {
+            if (isComplete(placement)) env.actions.submit(placement);
+          }}
+        >
+          {STRINGS.round.ready}
+        </Button>
+      </Dock>
     </Stack>
   );
 }

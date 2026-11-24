@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { GameKey, Snapshot } from '../shared/protocol';
 import { isInAppBrowser, useWakeLock } from './device';
 import { gamePath, navigate, navigationCause, route, type Route } from './router';
+import type { DevGalleryPage } from './dev/Gallery';
 import { ScreenEnvContext, type ScreenEnv } from './screens/env';
 import { HomeScreen } from './screens/HomeScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
@@ -30,7 +31,8 @@ export function App() {
   const [editing, setEditing] = useState(false);
   const current = route.value;
 
-  if (current.name === 'devUi' || current.name === 'devScreens') return <DevPage route={current} />;
+  if (current.name === 'devUi' || current.name === 'devScreens' || current.name === 'devRanking')
+    return <DevPage route={current} />;
 
   if (profile === null || editing) {
     const store = appStore();
@@ -44,6 +46,7 @@ export function App() {
     return (
       <ProfileScreen
         initial={initial}
+        initialPhoto={storage.loadPhoto()}
         submitLabel={
           current.name === 'game' && profile === null
             ? STRINGS.profile.saveAndJoin
@@ -55,12 +58,16 @@ export function App() {
             setEditing(false);
           },
         })}
-        onSave={(next) => {
+        onSave={(next, photo) => {
+          const photoChanged = photo !== storage.loadPhoto();
           storage.saveProfile(next);
+          storage.savePhoto(photo);
           setProfile(next);
           setEditing(false);
-          // In a lobby, the game hears about the new name / picture too (G-5).
+          // In a lobby, the game hears about the new name / picture too (G-5). A new photo goes up
+          // over HTTP (the store decides whether this game may still take it).
           if (store.snapshot.value?.phase === 'LOBBY') store.updateProfile(next);
+          if (photoChanged) store.photoChanged(photo);
         }}
       />
     );
@@ -263,8 +270,10 @@ export function PhaseScreen(props: {
 }
 
 /** The dev galleries — dev and staging builds only (production drops this import entirely). */
-function DevPage(props: { route: Extract<Route, { name: 'devUi' | 'devScreens' }> }) {
-  const [Gallery, setGallery] = useState<ComponentType<{ page: 'ui' | 'screens' }> | null>(null);
+const DEV_PAGES = { devUi: 'ui', devScreens: 'screens', devRanking: 'ranking' } as const;
+
+function DevPage(props: { route: Extract<Route, { name: keyof typeof DEV_PAGES }> }) {
+  const [Gallery, setGallery] = useState<ComponentType<{ page: DevGalleryPage }> | null>(null);
   useEffect(() => {
     if (import.meta.env.MODE !== 'production') {
       void import('./dev/Gallery').then((module) => {
@@ -273,5 +282,5 @@ function DevPage(props: { route: Extract<Route, { name: 'devUi' | 'devScreens' }
     }
   }, []);
   if (Gallery === null) return null;
-  return <Gallery page={props.route.name === 'devUi' ? 'ui' : 'screens'} />;
+  return <Gallery page={DEV_PAGES[props.route.name]} />;
 }

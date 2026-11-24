@@ -1,5 +1,5 @@
 // Routes (G-17): `/` (Profile / Home) and `/g/<KEY>` (everything inside a game), plus the dev
-// galleries `/dev/ui` and `/dev/screens` (dev + staging builds only). The game SCREEN comes from
+// galleries `/dev/ui`, `/dev/screens` and the ranking test page `/dev/ranking` (dev + staging builds only). The game SCREEN comes from
 // the store, never from the URL — so refresh and Back always land correctly.
 import { signal } from '@preact/signals';
 import type { GameKey } from '../shared/protocol';
@@ -9,7 +9,8 @@ export type Route =
   | { readonly name: 'home' }
   | { readonly name: 'game'; readonly key: GameKey }
   | { readonly name: 'devUi' }
-  | { readonly name: 'devScreens' };
+  | { readonly name: 'devScreens' }
+  | { readonly name: 'devRanking' };
 
 export function parseRoute(pathname: string): Route {
   const game = /^\/g\/([^/]+)\/?$/.exec(pathname);
@@ -17,6 +18,7 @@ export function parseRoute(pathname: string): Route {
   if (key !== undefined && isGameKey(key)) return { name: 'game', key };
   if (pathname === '/dev/ui') return { name: 'devUi' };
   if (pathname === '/dev/screens') return { name: 'devScreens' };
+  if (pathname === '/dev/ranking') return { name: 'devRanking' };
   return { name: 'home' };
 }
 

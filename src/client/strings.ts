@@ -35,7 +35,13 @@ export const STRINGS = {
     nicknameTooLong: (max: number) => `That's more than ${String(max)} characters.`,
     picture: 'Picture',
     pickAvatar: (emoji: string) => `Avatar ${emoji}`,
-    photoSoon: 'Selfies and photos arrive soon.',
+    takeSelfie: 'Take selfie',
+    choosePhoto: 'Choose photo',
+    photoOr: 'Or use a photo:',
+    photoInUse: 'Using your photo. Tap an emoji to use it instead.',
+    photoUnreadable:
+      "This phone can't read that picture. Try another one — the emoji stays for now.",
+    photoFailed: "Couldn't use that picture. Try another one — the emoji stays for now.",
     save: 'Save',
     saveAndJoin: 'Save and join',
     edit: 'Edit profile',
@@ -92,13 +98,22 @@ export const STRINGS = {
     readyCount: (ready: number, total: number) => `${String(ready)} / ${String(total)} ready`,
     placeAll: 'Place everyone to continue',
     placeTop: (n: number) => `Pick your top ${String(n)}`,
-    tapToPlace: 'Tap a player, then a spot.',
     waitingTitle: 'Waiting for the others…',
     answering: 'Answering…',
     readyMark: 'Ready ✓',
     notThisRound: "You'll join from the next question",
     timeUp: "Time's up",
     secondsLeft: (s: number) => `${String(s)} seconds left`,
+  },
+  ranking: {
+    /** How to place, by how a drag starts (ranking/gesture.ts DragStart). */
+    howTo: {
+      immediate: 'Drag players into the spots — or tap a player, then a spot.',
+      hold: 'Hold a player to drag them — or tap a player, then a spot.',
+    },
+    spots: 'Your ranking',
+    pool: 'Players to place',
+    dropToRemove: 'Drop here to take them out',
   },
   results: {
     revealing: 'And the group says…',
@@ -178,8 +193,9 @@ export const STRINGS = {
   } satisfies Partial<Record<ErrorCode, string>>,
   fallbackNotice: 'Something went wrong.',
   dev: {
-    gallery: 'Component gallery',
+    ui: 'Component gallery',
     screens: 'Screen gallery',
+    ranking: 'Ranking test',
   },
 } as const;
 

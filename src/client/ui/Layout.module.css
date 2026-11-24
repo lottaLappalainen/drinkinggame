@@ -121,6 +121,15 @@
   gap: var(--space-8);
 }
 
+/* Dock: the main action stays reachable under a long scrolling page. */
+.dock {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-pinned);
+  padding-block: var(--space-3);
+  background: var(--color-background);
+}
+
 @keyframes screen-enter {
   from {
     opacity: 0;

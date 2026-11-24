@@ -71,8 +71,8 @@ test('three phones play a whole round', async ({ page: host, browser }, testInfo
     await expect(phone.getByRole('button', { name: 'Ready', exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    const pool = phone.getByRole('list', { name: 'Tap a player, then a spot.' });
-    const spots = phone.locator('ol li button');
+    const pool = phone.getByRole('list', { name: 'Players to place' });
+    const spots = phone.getByRole('list', { name: 'Your ranking' }).getByRole('button');
     for (let spot = 0; spot < 3; spot++) {
       await pool.getByRole('button').first().click();
       await spots.nth(spot).click();

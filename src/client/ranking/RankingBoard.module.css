@@ -1,4 +1,4 @@
-/* INTERIM ranking board (tap-to-place) — 5B replaces it with the drag version after the phone test. */
+/* The ranking board (G-36): spots above the list of players still to place; drag or tap. */
 
 .board {
   display: flex;
@@ -7,6 +7,8 @@
   padding-inline: var(--edge-gutter);
 }
 
+/* ── Spots ── */
+
 .spots {
   display: flex;
   flex-direction: column;
@@ -14,6 +16,15 @@
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Podium: the long list scrolls under the three spots, so they stay reachable for a drag. */
+.spotsPinned {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-pinned);
+  padding-block: var(--space-2);
+  background: var(--color-background);
 }
 
 .spot {
@@ -29,8 +40,9 @@
   color: var(--color-text);
   text-align: left;
   cursor: pointer;
-  user-select: none;
-  -webkit-touch-callout: none;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
 }
 
 .spotFilled {
@@ -43,6 +55,13 @@
   box-shadow: var(--focus-ring);
 }
 
+/* A dragged player is over this spot. */
+.spotOver {
+  border-style: solid;
+  border-color: var(--color-indicator);
+  transform: scale(var(--drag-scale));
+}
+
 .spotNumber {
   flex: none;
   width: var(--avatar-sm);
@@ -50,6 +69,14 @@
   font-weight: var(--font-weight-heavy);
   color: var(--color-heading);
   text-align: center;
+}
+
+.spotPlayer {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
 .spotBody {
@@ -73,13 +100,31 @@
   white-space: nowrap;
 }
 
+/* ── The list of players still to place ── */
+
 .pool {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--pick-tile-width), 1fr));
   gap: var(--space-2);
+  min-height: var(--button-height-lg);
   margin: 0;
-  padding: 0;
+  padding: var(--space-2);
+  border: var(--border-width-strong) dashed transparent;
+  border-radius: var(--radius-md);
   list-style: none;
+}
+
+/* A placed player is dragged back over the list. */
+.poolOver {
+  border-color: var(--color-indicator);
+}
+
+.poolHint {
+  grid-column: 1 / -1;
+  align-self: center;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  text-align: center;
 }
 
 .candidate {
@@ -87,7 +132,7 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
-  width: calc(var(--avatar-lg) + var(--space-3));
+  width: 100%;
   min-height: var(--tap-min);
   padding: var(--space-2) var(--space-1);
   border: var(--border-width-strong) solid transparent;
@@ -96,20 +141,77 @@
   color: var(--color-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-bold);
-  overflow-wrap: anywhere;
   cursor: pointer;
-  user-select: none;
-  -webkit-touch-callout: none;
-  transition: transform var(--dur-fast) var(--ease-out);
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
 }
 
 .candidate:active {
   transform: scale(var(--press-scale));
 }
 
+.candidateName {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .candidateSelected {
   border-color: var(--color-indicator);
   transform: translateY(calc(-1 * var(--space-1)));
+}
+
+/* ── Drag handles (spots with a player, and list tiles) ── */
+
+.handleImmediate,
+.handleHold {
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* Short lists: the finger drags at once, the page never scrolls from here. */
+.handleImmediate {
+  touch-action: none;
+}
+
+/* The long list: the finger scrolls; press-and-hold lifts (the board blocks scrolling then). */
+.handleHold {
+  touch-action: pan-y;
+}
+
+/* The player's own place while its copy is under the finger. */
+.lifted {
+  opacity: var(--opacity-faded);
+}
+
+.boardDragging {
+  cursor: grabbing;
+  user-select: none;
+}
+
+/* The copy under the finger: positioned by a transform written from code, never by layout. */
+.ghost {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: var(--z-drag);
+  pointer-events: none;
+}
+
+.ghostChip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-strong) solid var(--color-indicator);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-2);
+  white-space: nowrap;
+  transform: translate(-50%, -50%) scale(var(--drag-scale));
 }
 
 .board button:disabled {

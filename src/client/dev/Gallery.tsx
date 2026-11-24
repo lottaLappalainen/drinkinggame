@@ -8,7 +8,8 @@ import { MESSAGE_FIXTURES, type MessageFixture } from '../../../test/fixtures/me
 import { SCREEN_FIXTURES } from '../../../test/fixtures/snapshots';
 import { manyPlayers, P, T0 } from '../../../test/fixtures/common';
 import { PhaseScreen } from '../app';
-import { RankingBoard, type Placement } from '../ranking/RankingBoard';
+import type { Placement } from '../ranking/gesture';
+import { RankingBoard } from '../ranking/RankingBoard';
 import { navigate } from '../router';
 import { FROZEN_ACTIONS, ScreenEnvContext, type ScreenEnv } from '../screens/env';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -27,31 +28,37 @@ import { STRINGS } from '../strings';
 import { Button, IconButton, SegmentedControl, TextInput, Toggle } from '../ui/Controls';
 import { Badge, Banner, Card, Spinner, StatusStrip, Toast } from '../ui/Feedback';
 import { Avatar, Countdown, Drumroll, PlayerChip, ReadyList, RevealStep } from '../ui/Game';
-import { Row, Stack } from '../ui/Layout';
+import { Dock, Row, Stack } from '../ui/Layout';
+import { PhotoPicker } from '../ui/PhotoPicker';
 import { QrCode } from '../ui/QrCode';
 import { Heading, Text } from '../ui/Text';
 import styles from './Gallery.module.css';
+import { RankingPrototype } from './RankingPrototype';
 
-export function Gallery(props: { page: 'ui' | 'screens' }) {
+/** The dev pages: component gallery, screen gallery, ranking test page (5B, phone test U5). */
+export type DevGalleryPage = 'ui' | 'screens' | 'ranking';
+
+const PAGE_PATHS: Record<DevGalleryPage, string> = {
+  ui: '/dev/ui',
+  screens: '/dev/screens',
+  ranking: '/dev/ranking',
+};
+
+export function Gallery(props: { page: DevGalleryPage }) {
   return (
     <div class={styles.page}>
       <div class={styles.bar}>
-        <Button
-          variant={props.page === 'ui' ? 'primary' : 'ghost'}
-          onClick={() => {
-            navigate('/dev/ui');
-          }}
-        >
-          {STRINGS.dev.gallery}
-        </Button>
-        <Button
-          variant={props.page === 'screens' ? 'primary' : 'ghost'}
-          onClick={() => {
-            navigate('/dev/screens');
-          }}
-        >
-          {STRINGS.dev.screens}
-        </Button>
+        {(['ui', 'screens', 'ranking'] as const).map((page) => (
+          <Button
+            key={page}
+            variant={props.page === page ? 'primary' : 'ghost'}
+            onClick={() => {
+              navigate(PAGE_PATHS[page]);
+            }}
+          >
+            {STRINGS.dev[page]}
+          </Button>
+        ))}
         <Button
           variant="ghost"
           onClick={() => {
@@ -63,7 +70,9 @@ export function Gallery(props: { page: 'ui' | 'screens' }) {
         {/* The screen gallery in either theme (the component gallery shows both side by side). */}
         <ThemePicker storage={appStorage()} />
       </div>
-      {props.page === 'ui' ? <ComponentGallery /> : <ScreenGallery />}
+      {props.page === 'ui' && <ComponentGallery />}
+      {props.page === 'screens' && <ScreenGallery />}
+      {props.page === 'ranking' && <RankingPrototype />}
     </div>
   );
 }
@@ -93,13 +102,15 @@ function Section(props: { title: string; children: ComponentChildren }) {
 }
 
 const SIX = manyPlayers(6);
+const TWELVE = manyPlayers(12);
 const noop = () => undefined;
 
 function Components() {
   const [text, setText] = useState('Mikko');
   const [segment, setSegment] = useState<15 | 25 | 35>(25);
   const [toggle, setToggle] = useState(true);
-  const [placement, setPlacement] = useState<Placement>([P.aino, null, null]);
+  const [placement, setPlacement] = useState<Placement>([P.aino, null, null, null, null]);
+  const [podium, setPodium] = useState<Placement>([null, null, null]);
   return (
     <>
       <Section title="Colors">
@@ -200,6 +211,11 @@ function Components() {
           <Avatar presetId="frog" faded />
         </Row>
       </Section>
+      <Section title="Photo buttons (idle / reading a photo / unreadable photo)">
+        <PhotoPicker onFile={noop} />
+        <PhotoPicker onFile={noop} busy />
+        <PhotoPicker onFile={noop} error={STRINGS.profile.photoUnreadable} />
+      </Section>
       <Section title="Players">
         {SIX.slice(0, 3).map((player, i) => (
           <PlayerChip key={player.playerId} player={player} isHost={i === 0} isYou={i === 1} />
@@ -220,14 +236,30 @@ function Components() {
         <RevealStep label="Most likely" players={SIX.slice(0, 2)} top />
         <Drumroll />
       </Section>
-      <Section title="Ranking board (interim, tap to place)">
+      <Section title="Ranking board — Spotlight (drag or tap; full test page: /dev/ranking)">
         <RankingBoard
           candidates={SIX.slice(0, 5)}
-          spots={3}
-          captionFor={(spot) => ['Most likely', '2nd most likely', '3rd most likely'][spot] ?? null}
+          spots={5}
+          captionFor={(spot) => (spot === 0 ? 'Most likely' : spot === 4 ? 'Least likely' : null)}
           placement={placement}
           onChange={setPlacement}
         />
+      </Section>
+      <Section title="Ranking board — Podium (12 players, hold to drag)">
+        <RankingBoard
+          candidates={TWELVE}
+          spots={3}
+          captionFor={(spot) => ['Most likely', '2nd most likely', '3rd most likely'][spot] ?? null}
+          placement={podium}
+          onChange={setPodium}
+        />
+      </Section>
+      <Section title="Dock (the main action pinned to the bottom of a long page)">
+        <Dock>
+          <Button variant="accent" size="lg" block>
+            Ready
+          </Button>
+        </Dock>
       </Section>
       <Section title="QR code">
         <QrCode value="https://example.com/g/ABCDE" label="Join ABCDE" />
@@ -264,6 +296,7 @@ function ScreenGallery() {
       <Frame name="profile" screen="1 Profile (first visit)">
         <ProfileScreen
           initial={{ nickname: '', presetId: 'fox' }}
+          initialPhoto={null}
           submitLabel="Save"
           onSave={noop}
           storage={null}

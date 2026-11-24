@@ -23,17 +23,37 @@ function tokenValue(name: string, fallback: string): string {
   }
 }
 
+/** The ref `useFlip` returns: attach it to the list; `from` overrides where an item comes from. */
+export type FlipRef<T extends HTMLElement> = {
+  current: T | null;
+  /**
+   * Item `key` glides in from this viewport position on the next render instead of from its old
+   * place — e.g. a dragged player dropped into a spot glides from where the finger let go.
+   */
+  from: (key: string, viewport: { left: number; top: number }) => void;
+};
+
 /**
  * FLIP for a list: children with `data-flip="<key>"` glide from where they were to where they are
  * after a re-render; new ones pop in. Attach the returned ref to the list element.
  */
-// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller picks the element type its ref prop needs
-export function useFlip<T extends HTMLElement>(): { current: T | null } {
-  const ref = useRef<T>(null);
+export function useFlip<T extends HTMLElement>(): FlipRef<T> {
   const before = useRef(new Map<string, { left: number; top: number }>());
+  const ref = useRef<FlipRef<T>>({
+    current: null,
+    from: (key, viewport) => {
+      const list = ref.current.current;
+      if (list === null) return;
+      const origin = list.getBoundingClientRect();
+      before.current.set(key, {
+        left: viewport.left - origin.left,
+        top: viewport.top - origin.top,
+      });
+    },
+  });
 
   useLayoutEffect(() => {
-    const list = ref.current;
+    const list = ref.current.current;
     if (list === null || typeof list.animate !== 'function') return;
     const duration = tokenMs('--dur-base');
     const easing = tokenValue('--ease-out', 'ease-out');
@@ -69,5 +89,5 @@ export function useFlip<T extends HTMLElement>(): { current: T | null } {
     before.current = now;
   });
 
-  return ref;
+  return ref.current;
 }
