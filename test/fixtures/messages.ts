@@ -13,7 +13,7 @@ export const MESSAGE_FIXTURES: readonly MessageFixture[] = [
   {
     name: 'ended-updated',
     screen:
-      '"The game was updated — please start a new game" (saved state failed version/schema check)',
+      '"The game was updated. Please start a new game" (saved state failed version/schema check)',
     message: { type: 'gameEnded', reason: 'updated', summary: null },
   },
   {
@@ -28,12 +28,12 @@ export const MESSAGE_FIXTURES: readonly MessageFixture[] = [
   },
   {
     name: 'error-name-taken',
-    screen: '"Name taken" — owner online (G-14)',
+    screen: '"Name taken": owner online (G-14)',
     message: { type: 'error', code: 'NAME_TAKEN' },
   },
   {
     name: 'error-name-taken-reclaimable',
-    screen: '"Name taken" + "That\'s me" — owner offline (G-14, G-44)',
+    screen: '"Name taken" + "That\'s me": owner offline (G-14, G-44)',
     message: { type: 'error', code: 'NAME_TAKEN', reclaimPlayerId: P.emma },
   },
   {
@@ -63,7 +63,7 @@ export const MESSAGE_FIXTURES: readonly MessageFixture[] = [
   },
   {
     name: 'error-server-updating',
-    screen: '"Updating…" — retry without reload',
+    screen: '"Updating…": retry without reload',
     message: { type: 'error', code: 'SERVER_UPDATING' },
   },
   {

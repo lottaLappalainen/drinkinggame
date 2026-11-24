@@ -119,6 +119,7 @@ function question(setup: Setup, roundId: number, startedAt: number): SnapshotOf<
       answerStartsAt,
       endsAt: answerStartsAt + ROUND_MS,
       ready: [],
+      subjectId: null,
     },
   };
 }
@@ -208,7 +209,7 @@ export function RankingPrototype() {
         </Button>
         {attempts.map((attempt, i) => (
           <Text key={i} variant="small">
-            {`${attempt.seconds.toFixed(1)} s — ${String(attempt.setup.count)} players, ${attempt.setup.mode}: ${attempt.ranking.join(', ')}`}
+            {`${attempt.seconds.toFixed(1)} s: ${String(attempt.setup.count)} players, ${attempt.setup.mode}: ${attempt.ranking.join(', ')}`}
           </Text>
         ))}
       </Card>

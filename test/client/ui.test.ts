@@ -41,4 +41,18 @@ describe('strings (Q-5)', () => {
     for (const code of ErrorCodeSchema.options) expect(noticeText(code).length).toBeGreaterThan(5);
     expect(STRINGS.round.readyCount(6, 8)).toBe('6 / 8 ready');
   });
+
+  it('no text the app shows uses an em dash (user decision 2026-11-24: plain punctuation)', () => {
+    // Every string, and every text function's output (called with sample values).
+    const texts: string[] = [];
+    const collect = (value: unknown): void => {
+      if (typeof value === 'string') texts.push(value);
+      else if (typeof value === 'function')
+        collect((value as (...args: unknown[]) => unknown)(3, 3));
+      else if (typeof value === 'object' && value !== null) Object.values(value).forEach(collect);
+    };
+    collect(STRINGS);
+    expect(texts.length).toBeGreaterThan(100);
+    expect(texts.filter((text) => text.includes('—'))).toEqual([]);
+  });
 });

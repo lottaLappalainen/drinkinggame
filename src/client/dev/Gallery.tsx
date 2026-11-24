@@ -236,7 +236,7 @@ function Components() {
         <RevealStep label="Most likely" players={SIX.slice(0, 2)} top />
         <Drumroll />
       </Section>
-      <Section title="Ranking board — Spotlight (drag or tap; full test page: /dev/ranking)">
+      <Section title="Ranking board: Spotlight (drag or tap; full test page: /dev/ranking)">
         <RankingBoard
           candidates={SIX.slice(0, 5)}
           spots={5}
@@ -245,7 +245,7 @@ function Components() {
           onChange={setPlacement}
         />
       </Section>
-      <Section title="Ranking board — Podium (12 players, hold to drag)">
+      <Section title="Ranking board: Podium (12 players, hold to drag)">
         <RankingBoard
           candidates={TWELVE}
           spots={3}
@@ -264,7 +264,7 @@ function Components() {
       <Section title="QR code">
         <QrCode value="https://example.com/g/ABCDE" label="Join ABCDE" />
       </Section>
-      <Section title="Toast & status strip (fixed — shown in place here)">
+      <Section title="Toast & status strip (fixed, shown in place here)">
         <div>
           <Toast message="Not enough players for that." onDismiss={noop} />
         </div>

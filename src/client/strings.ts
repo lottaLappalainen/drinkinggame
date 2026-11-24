@@ -6,6 +6,12 @@ import type { ErrorCode } from '../shared/protocol';
 
 const plural = (n: number, one: string, many: string) => `${String(n)} ${n === 1 ? one : many}`;
 
+/** "Drink" / "Give out", or "You drink" / "You give out" (D-6). */
+function drinkWords(action: 'drink' | 'give', you: boolean): string {
+  if (action === 'drink') return you ? 'You drink' : 'Drink';
+  return you ? 'You give out' : 'Give out';
+}
+
 export const STRINGS = {
   appName: 'drinkinggame', // working title (GAME_DESCRIPTION: final name not decided)
   common: {
@@ -30,7 +36,7 @@ export const STRINGS = {
     title: 'Who are you?',
     intro: 'Pick a name and a picture. Your friends will rank you by them.',
     nickname: 'Nickname',
-    nicknameHint: (max: number) => `Up to ${String(max)} characters — emoji count as one.`,
+    nicknameHint: (max: number) => `Up to ${String(max)} characters. Emoji count as one.`,
     nicknameEmpty: 'Pick a nickname.',
     nicknameTooLong: (max: number) => `That's more than ${String(max)} characters.`,
     picture: 'Picture',
@@ -39,9 +45,8 @@ export const STRINGS = {
     choosePhoto: 'Choose photo',
     photoOr: 'Or use a photo:',
     photoInUse: 'Using your photo. Tap an emoji to use it instead.',
-    photoUnreadable:
-      "This phone can't read that picture. Try another one — the emoji stays for now.",
-    photoFailed: "Couldn't use that picture. Try another one — the emoji stays for now.",
+    photoUnreadable: "This phone can't read that picture. Try another one, or keep the emoji.",
+    photoFailed: "Couldn't use that picture. Try another one, or keep the emoji.",
     save: 'Save',
     saveAndJoin: 'Save and join',
     edit: 'Edit profile',
@@ -62,7 +67,7 @@ export const STRINGS = {
   },
   lobby: {
     keyLabel: 'Game key',
-    shareHint: 'Scan to join — or open the link:',
+    shareHint: 'Scan to join, or open the link:',
     players: (n: number) => plural(n, 'player', 'players'),
     settings: 'Game settings',
     length: 'Questions',
@@ -74,8 +79,8 @@ export const STRINGS = {
     mode: 'Game mode',
     modeNames: { spotlight: 'Spotlight', podium: 'Podium' },
     modeHints: {
-      spotlight: 'A few players per question — rank them all.',
-      podium: 'Everyone, every question — pick your top 3.',
+      spotlight: 'A few players per question. Rank them all.',
+      podium: 'Everyone, every question. Pick your top 3.',
     },
     podiumNeedsPlayers: (n: number) => `Podium needs ${String(n)}+ players`,
     start: 'Start game',
@@ -86,13 +91,15 @@ export const STRINGS = {
     removeTitle: (name: string) => `Remove ${name}?`,
     removeBody: "They can't come back as themselves.",
     leaveTitle: 'Leave this game?',
-    leaveBody: "You can't come back as yourself — joining again makes you a new player.",
+    leaveBody: "You can't come back as yourself. Joining again makes you a new player.",
     reclaimTitle: (name: string) => `Someone says they are ${name}`,
     reclaimBody: 'Their phone lost its login. Let them continue as this player?',
     approve: "Yes, it's them",
     deny: 'No',
   },
   round: {
+    /** Stands in for a "[player]" name the phone can't find (shouldn't happen, G-51). */
+    someone: 'someone',
     number: (n: number, total: number) => `${String(n)} / ${String(total)}`,
     ready: 'Ready',
     readyCount: (ready: number, total: number) => `${String(ready)} / ${String(total)} ready`,
@@ -108,8 +115,8 @@ export const STRINGS = {
   ranking: {
     /** How to place, by how a drag starts (ranking/gesture.ts DragStart). */
     howTo: {
-      immediate: 'Drag players into the spots — or tap a player, then a spot.',
-      hold: 'Hold a player to drag them — or tap a player, then a spot.',
+      immediate: 'Drag players into the spots, or tap a player and then a spot.',
+      hold: 'Hold a player to drag them, or tap a player and then a spot.',
     },
     spots: 'Your ranking',
     pool: 'Players to place',
@@ -127,6 +134,19 @@ export const STRINGS = {
     next: 'Next question',
     finish: 'Finish',
     waitingForHost: 'Waiting for the host…',
+  },
+  // Drinking rules (D-1…D-9): the number comes from the server; the words live here.
+  drinks: {
+    sips: (n: number) => (n === 1 ? 'sip' : 'sips'),
+    /** The words before the number: "Drink" / "Give out", or "You drink" / "You give out". */
+    words: drinkWords,
+    each: 'each',
+    /** Full sentences for screen readers and the "you" banner: "Drink 5 sips", "You give out 1 sip". */
+    sentence: (action: 'drink' | 'give', n: number, you = false) =>
+      `${drinkWords(action, you)} ${String(n)} ${n === 1 ? 'sip' : 'sips'}`,
+    /** Compact chip on the full ranking: "drinks 5", "gives out 7". */
+    chip: (action: 'drink' | 'give', n: number) =>
+      `${action === 'drink' ? 'drinks' : 'gives out'} ${String(n)}`,
   },
   paused: {
     title: 'Waiting for players',
@@ -146,7 +166,10 @@ export const STRINGS = {
     endBody: 'Answers of the current question are lost.',
   },
   exit: {
-    notFound: { title: 'Game not found', body: 'Check the key — or the game has already ended.' },
+    notFound: {
+      title: 'Game not found',
+      body: 'Check the key. The game may also have ended already.',
+    },
     left: { title: 'You left this game', body: 'Joining again makes you a new player.' },
     removed: {
       title: 'You were removed from this game',
@@ -173,7 +196,7 @@ export const STRINGS = {
     tryName: 'Use this name',
     gameFull: 'Game is full',
     gameFullBody: (max: number) => `This game already has ${String(max)} players.`,
-    invalidName: 'That name doesn’t work — try another.',
+    invalidName: 'That name doesn’t work. Try another one.',
     reclaimWaiting: 'Waiting for the host…',
     reclaimWaitingBody: 'The host has to confirm that it is you.',
     reclaimDenied: 'The host said no',
@@ -181,14 +204,14 @@ export const STRINGS = {
   },
   notices: {
     NOT_ALLOWED: "That isn't possible right now.",
-    NOT_ENOUGH_PLAYERS: 'Not enough players for that — someone may have just left.',
+    NOT_ENOUGH_PLAYERS: 'Not enough players for that. Someone may have just left.',
     PAUSED: 'Waiting for players before the next question.',
-    INVALID: 'Something went wrong — please try again.',
+    INVALID: 'Something went wrong. Please try again.',
     NOT_ENOUGH_QUESTIONS: 'Not enough questions for that length.',
     RECLAIM_UNAVAILABLE: "That player is back or can't be taken over right now.",
     NOT_FOUND: 'That player is no longer in the game.',
-    INVALID_NICKNAME: 'That name doesn’t work — try another.',
-    TOO_EARLY: 'One moment — try again.',
+    INVALID_NICKNAME: 'That name doesn’t work. Try another one.',
+    TOO_EARLY: 'One moment, then try again.',
     CREATE_FAILED: "Couldn't create a game.",
   } satisfies Partial<Record<ErrorCode, string>>,
   fallbackNotice: 'Something went wrong.',
