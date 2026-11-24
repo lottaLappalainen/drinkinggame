@@ -212,8 +212,10 @@ function FullRanking(props: {
   const myStep = results.steps.find((step) => step.playerIds.includes(props.me));
   for (const step of results.steps)
     if (step.rule !== null) for (const id of step.playerIds) rules.set(id, step.rule);
+  // Two blocks, spaced like the screen's own blocks (`Screen` gap = space 5): the viewer's own rule,
+  // then the ranking, whose heading, rows and "No votes" group sit closer together (space 3).
   return (
-    <Stack gap="3">
+    <Stack gap="5">
       {myStep?.rule != null && (
         <Center>
           <DrinkBadge
@@ -224,51 +226,53 @@ function FullRanking(props: {
           />
         </Center>
       )}
-      <Stack gap="1">
-        <Heading level={2}>{STRINGS.results.fullRanking}</Heading>
-        <Text variant="small">{props.orderLabel}</Text>
-      </Stack>
-      <PlayerList
-        label={STRINGS.results.fullRanking}
-        items={ranked.map(({ player, place }) => {
-          const rule = rules.get(player.playerId);
-          return {
-            key: player.playerId,
-            content: (
-              <Row gap="3">
-                <PlaceNumber place={place} />
-                <Stack grow gap="0">
+      <Stack gap="3">
+        <Stack gap="1">
+          <Heading level={2}>{STRINGS.results.fullRanking}</Heading>
+          <Text variant="small">{props.orderLabel}</Text>
+        </Stack>
+        <PlayerList
+          label={STRINGS.results.fullRanking}
+          items={ranked.map(({ player, place }) => {
+            const rule = rules.get(player.playerId);
+            return {
+              key: player.playerId,
+              content: (
+                <Row gap="3">
+                  <PlaceNumber place={place} />
+                  <Stack grow gap="0">
+                    <PlayerChip
+                      player={player}
+                      source={props.source}
+                      isYou={player.playerId === props.me}
+                      meta={rule !== undefined && <DrinkChip rule={rule} />}
+                    />
+                  </Stack>
+                </Row>
+              ),
+            };
+          })}
+        />
+        {noVotes.length > 0 && (
+          <Card label={NO_VOTES_LABEL}>
+            <Text variant="label">{NO_VOTES_LABEL}</Text>
+            <PlayerList
+              label={NO_VOTES_LABEL}
+              items={noVotes.map((player) => ({
+                key: player.playerId,
+                content: (
                   <PlayerChip
                     player={player}
                     source={props.source}
                     isYou={player.playerId === props.me}
-                    meta={rule !== undefined && <DrinkChip rule={rule} />}
                   />
-                </Stack>
-              </Row>
-            ),
-          };
-        })}
-      />
-      {noVotes.length > 0 && (
-        <Card label={NO_VOTES_LABEL}>
-          <Text variant="label">{NO_VOTES_LABEL}</Text>
-          <PlayerList
-            label={NO_VOTES_LABEL}
-            items={noVotes.map((player) => ({
-              key: player.playerId,
-              content: (
-                <PlayerChip
-                  player={player}
-                  source={props.source}
-                  isYou={player.playerId === props.me}
-                />
-              ),
-            }))}
-          />
-        </Card>
-      )}
-      {results.noVotes === null && <Text variant="small">{STRINGS.results.onlyTop}</Text>}
+                ),
+              }))}
+            />
+          </Card>
+        )}
+        {results.noVotes === null && <Text variant="small">{STRINGS.results.onlyTop}</Text>}
+      </Stack>
     </Stack>
   );
 }

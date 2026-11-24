@@ -238,8 +238,11 @@
   color: var(--rule-give-fg);
 }
 
-/* The viewer has to drink / give: ringed, like the "most likely" card. */
+/* The viewer has to drink / give: ringed, like the "most likely" card. An outline takes no layout
+   space, so the margin reserves the ring's width + offset: what you see ends where the box ends,
+   and the gaps around the badge stay the ones the layout asks for. */
 .ruleYou {
+  margin: calc(var(--focus-ring-width) * 2);
   outline: var(--focus-ring-width) solid var(--color-indicator-strong);
   outline-offset: var(--focus-ring-width);
 }
