@@ -34,6 +34,8 @@ export const PENDING_REQUESTS = [
   'setSettings',
   'leave',
   'end',
+  'removePlayer',
+  'answerReclaim',
 ] as const satisfies readonly ClientMessageType[];
 export type PendingRequest = (typeof PENDING_REQUESTS)[number];
 

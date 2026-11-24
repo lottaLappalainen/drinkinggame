@@ -289,6 +289,12 @@ export function createStore(deps: StoreDeps) {
       case 'settingsChanged':
         setPending('setSettings', false);
         return;
+      case 'playerLeft':
+        setPending('removePlayer', false);
+        return;
+      case 'reclaimClosed':
+        setPending('answerReclaim', false); // the server closes a request on every answer
+        return;
       case 'gameEnded':
         pending.value = new Set();
         return;
@@ -471,10 +477,10 @@ export function createStore(deps: StoreDeps) {
       return send({ type: 'end' }, 'end');
     },
     removePlayer: (playerId: PlayerId): boolean => {
-      return send({ type: 'removePlayer', playerId });
+      return send({ type: 'removePlayer', playerId }, 'removePlayer');
     },
     answerReclaim: (requestId: RequestId, approve: boolean): boolean => {
-      return send({ type: 'answerReclaim', requestId, approve });
+      return send({ type: 'answerReclaim', requestId, approve }, 'answerReclaim');
     },
   };
 }

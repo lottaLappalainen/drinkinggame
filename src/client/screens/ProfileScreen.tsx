@@ -2,7 +2,7 @@
 // visit and from "Edit profile". The photo buttons arrive with 5D (photo pipeline).
 import { useState } from 'preact/hooks';
 import type { PresetId } from '../../shared/avatars';
-import { NICKNAME_MAX_GRAPHEMES } from '../../shared/constants';
+import { NICKNAME_MAX_GRAPHEMES, NICKNAME_MAX_INPUT_CHARS } from '../../shared/constants';
 import { validateNickname } from '../../shared/nickname';
 import type { Profile, Storage } from '../storage';
 import { STRINGS } from '../strings';
@@ -26,8 +26,8 @@ export function ProfileScreen(props: {
   const error =
     touched && !result.ok
       ? result.reason === 'empty'
-        ? STRINGS.profile.nickname
-        : STRINGS.profile.nicknameHint
+        ? STRINGS.profile.nicknameEmpty
+        : STRINGS.profile.nicknameTooLong(NICKNAME_MAX_GRAPHEMES)
       : null;
 
   return (
@@ -42,9 +42,9 @@ export function ProfileScreen(props: {
       <TextInput
         label={STRINGS.profile.nickname}
         value={nickname}
-        hint={STRINGS.profile.nicknameHint}
+        hint={STRINGS.profile.nicknameHint(NICKNAME_MAX_GRAPHEMES)}
         error={error}
-        maxLength={NICKNAME_MAX_GRAPHEMES * 4}
+        maxLength={NICKNAME_MAX_INPUT_CHARS}
         enterKeyHint="done"
         onInput={(value) => {
           setNickname(value);

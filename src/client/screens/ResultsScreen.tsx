@@ -4,6 +4,7 @@
 // from the question's label set (Q-8); a partial ranking (Podium) has no "least" and a "No votes"
 // group. The host's Next unlocks exactly at revealEndsAt (never the server's early tolerance).
 import type { PlayerId, PublicPlayer, RankedResults, SnapshotOf } from '../../shared/protocol';
+import { MIN_ANSWERS_FOR_RANKING } from '../../shared/constants';
 import { NO_VOTES_LABEL, placeLabel } from '../../shared/questionLabels';
 import { nextRevealChangeAt, revealPosition } from '../../shared/reveal';
 import { isPartialRanking } from '../../shared/spots';
@@ -11,10 +12,10 @@ import { STRINGS } from '../strings';
 import { Button } from '../ui/Controls';
 import { Card } from '../ui/Feedback';
 import { Drumroll, PlayerChip, PlayerList, RevealStep, type PhotoSource } from '../ui/Game';
-import { Center, Row, Screen, Spacer, Stack } from '../ui/Layout';
+import { Center, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
-import { EndGameButton, PausedBanner, photoSource, RoundHeader } from './parts';
+import { GameMenu, PausedBanner, photoSource, ReclaimPrompts, RoundHeader } from './parts';
 
 export function ResultsScreen(props: { snapshot: SnapshotOf<'RESULTS'> }) {
   const { snapshot } = props;
@@ -48,9 +49,6 @@ export function ResultsScreen(props: { snapshot: SnapshotOf<'RESULTS'> }) {
             {STRINGS.results.waitingForHost}
           </Text>
         )}
-        <Row justify="center">
-          <EndGameButton isHost={isHost} />
-        </Row>
       </Stack>
     ) : null;
 
@@ -61,6 +59,7 @@ export function ResultsScreen(props: { snapshot: SnapshotOf<'RESULTS'> }) {
         <Text variant="question">{round.question.text}</Text>
       </Stack>
       <PausedBanner paused={snapshot.paused} />
+      <ReclaimPrompts snapshot={snapshot} />
       {results.outcome === 'ranked' ? (
         <Ranked snapshot={snapshot} results={results} position={position} />
       ) : (
@@ -73,12 +72,13 @@ export function ResultsScreen(props: { snapshot: SnapshotOf<'RESULTS'> }) {
           <Text variant="muted" center>
             {results.outcome === 'nobodyAnswered'
               ? STRINGS.results.nobodyBody
-              : STRINGS.results.notEnoughBody}
+              : STRINGS.results.notEnoughBody(MIN_ANSWERS_FOR_RANKING)}
           </Text>
         </Center>
       )}
       <Spacer />
       {footer}
+      <GameMenu snapshot={snapshot} />
     </Screen>
   );
 }
@@ -153,16 +153,17 @@ function FullRanking(props: {
   me: PlayerId;
 }) {
   const { results } = props;
-  const ranked = props.players(results.ranking.map((e) => e.playerId));
-  const placeOf = new Map(results.ranking.map((e) => [e.playerId, e.place]));
+  // Each ranking entry with its player (entries name players of this game — invariants).
+  const ranked = results.ranking.flatMap((entry) =>
+    props.players([entry.playerId]).map((player) => ({ player, place: entry.place })),
+  );
   const noVotes = results.noVotes === null ? [] : props.players(results.noVotes);
   return (
     <Stack gap="3">
       <Heading level={2}>{STRINGS.results.fullRanking}</Heading>
       <PlayerList
         label={STRINGS.results.fullRanking}
-        items={ranked.map((player) => {
-          const place = placeOf.get(player.playerId) ?? 0;
+        items={ranked.map(({ player, place }) => {
           return {
             key: player.playerId,
             content: (

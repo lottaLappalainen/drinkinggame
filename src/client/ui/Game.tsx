@@ -1,13 +1,8 @@
 // Game pieces (CLAUDE.md §7): Avatar, PlayerChip, PlayerList, Countdown, ReadyList, RevealStep.
 // (QrCode lives in its own file: its library is loaded lazily, lobby only.)
 import type { ComponentChildren } from 'preact';
-import { useState } from 'preact/hooks';
-import {
-  AVATAR_PRESETS,
-  getAvatarPreset,
-  isAvatarPresetId,
-  type PresetId,
-} from '../../shared/avatars';
+import { useRef, useState } from 'preact/hooks';
+import { AVATAR_PRESETS, getAvatarPreset, type PresetId } from '../../shared/avatars';
 import type { GameId, GameKey, PlayerId, PublicPlayer } from '../../shared/protocol';
 import { readyCounter } from '../../shared/ready';
 import { STRINGS } from '../strings';
@@ -49,16 +44,14 @@ export function photoUrl(source: PhotoSource, playerId: PlayerId, version: numbe
  * if it fails. Decorative: the name next to it is the accessible label.
  */
 export function Avatar(props: {
-  presetId: string;
+  presetId: PresetId;
   photo?: string | null;
   size?: AvatarSize;
   faded?: boolean;
 }) {
   const [failed, setFailed] = useState(false);
-  // Safe fallback: presets are never removed, but stored data is checked anyway.
-  const preset = isAvatarPresetId(props.presetId)
-    ? getAvatarPreset(props.presetId)
-    : AVATAR_PRESETS[0];
+  // Typed all the way from the protocol / the checked stored profile — presets are never removed.
+  const preset = getAvatarPreset(props.presetId);
   return (
     <span
       class={cx(
@@ -170,8 +163,16 @@ export function Countdown(props: {
   now: number;
   frozen?: boolean;
 }) {
+  // Captured ONCE per round: a running CSS animation keeps its start time, so a delay recomputed on
+  // every re-render (each playerReady) would push the bar forward by the time since it appeared.
+  const timing = useRef<{ endsAt: number; elapsed: number } | null>(null);
   const total = Math.max(1, props.endsAt - props.startsAt);
-  const elapsed = Math.min(total, Math.max(0, props.now - props.startsAt));
+  if (timing.current?.endsAt !== props.endsAt)
+    timing.current = {
+      endsAt: props.endsAt,
+      elapsed: Math.min(total, Math.max(0, props.now - props.startsAt)),
+    };
+  const elapsed = timing.current.elapsed;
   const left = Math.max(0, Math.round((props.endsAt - props.now) / 1000));
   return (
     <div class={styles.countdown} role="timer" aria-label={STRINGS.round.secondsLeft(left)}>

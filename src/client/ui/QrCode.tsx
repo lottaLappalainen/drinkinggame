@@ -3,6 +3,7 @@
 // Drawn as one SVG path from the module matrix (no injected HTML).
 import { useEffect, useState } from 'preact/hooks';
 import { STRINGS } from '../strings';
+import { cx } from './cx';
 import { Spinner } from './Feedback';
 import styles from './Game.module.css';
 
@@ -37,7 +38,7 @@ export function QrCode(props: { value: string; label: string }) {
 
   if (matrix === null)
     return (
-      <div class={`${styles.qr ?? ''} ${styles.qrPlaceholder ?? ''}`}>
+      <div class={cx(styles.qr, styles.qrPlaceholder)}>
         <Spinner label={STRINGS.common.loading} />
       </div>
     );

@@ -11,23 +11,24 @@ import { isComplete, RankingBoard, type Placement } from '../ranking/RankingBoar
 import { STRINGS } from '../strings';
 import { Button } from '../ui/Controls';
 import { Countdown, ReadyList, readyCountOf } from '../ui/Game';
-import { Center, Row, Screen, Spacer, Stack } from '../ui/Layout';
+import { Center, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
-import { EndGameButton, PausedBanner, photoSource, RoundHeader } from './parts';
+import { GameMenu, PausedBanner, photoSource, ReclaimPrompts, RoundHeader } from './parts';
 
 export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
   const { snapshot } = props;
   const env = useEnv();
   const { round } = snapshot;
   const me = snapshot.you.playerId;
-  const isHost = snapshot.hostId === me;
   const source = photoSource(snapshot);
   const at = env.serverNow();
   const now = useNowUntil(nextRoundStepAt(at, round, snapshot.you.submitted));
   const step = roundStep(now, round, snapshot.you.submitted);
-  const myStatus = snapshot.players.find((p) => p.playerId === me)?.status ?? 'active';
-  const watching = isWaitingForNextRound(me, myStatus, round);
+  const mine = snapshot.players.find((p) => p.playerId === me);
+  // The snapshot always lists its own viewer (checkSnapshotInvariants).
+  if (mine === undefined) throw new Error('the snapshot does not list its viewer');
+  const watching = isWaitingForNextRound(me, mine.status, round);
   const counter = readyCountOf(round, snapshot.players);
 
   if (step === 'intro')
@@ -40,6 +41,8 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
           </Text>
         </Center>
         <PausedBanner paused={snapshot.paused} />
+        <ReclaimPrompts snapshot={snapshot} />
+        <GameMenu snapshot={snapshot} />
       </Screen>
     );
 
@@ -68,6 +71,8 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
         <Answer key={round.roundId} snapshot={snapshot} />
         {readyLine}
         <PausedBanner paused={snapshot.paused} />
+        <ReclaimPrompts snapshot={snapshot} />
+        <GameMenu snapshot={snapshot} />
       </Screen>
     );
 
@@ -95,10 +100,9 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
         me={me}
       />
       <PausedBanner paused={snapshot.paused} />
+      <ReclaimPrompts snapshot={snapshot} />
       <Spacer />
-      <Row justify="center">
-        <EndGameButton isHost={isHost} />
-      </Row>
+      <GameMenu snapshot={snapshot} />
     </Screen>
   );
 }

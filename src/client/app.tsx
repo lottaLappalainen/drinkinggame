@@ -5,7 +5,7 @@ import type { ComponentType } from 'preact';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { GameKey, Snapshot } from '../shared/protocol';
 import { isInAppBrowser, useWakeLock } from './device';
-import { gamePath, navigate, route, type Route } from './router';
+import { gamePath, navigate, navigationCause, route, type Route } from './router';
 import { ScreenEnvContext, type ScreenEnv } from './screens/env';
 import { HomeScreen } from './screens/HomeScreen';
 import { LobbyScreen } from './screens/LobbyScreen';
@@ -19,7 +19,7 @@ import {
   JoinProblemScreen,
   ReclaimScreen,
 } from './screens/StatusScreens';
-import { randomPreset, type Profile } from './storage';
+import { randomPreset, type Profile, type Storage } from './storage';
 import { appStorage, appStore } from './store/app';
 import { noticeText, STRINGS } from './strings';
 import { StatusStrip, Toast } from './ui/Feedback';
@@ -34,9 +34,16 @@ export function App() {
 
   if (profile === null || editing) {
     const store = appStore();
+    // In a game, edit how you appear THERE (a name picked after "Name taken" is for this game only,
+    // G-14) — not the saved profile's values.
+    const me = editing && current.name === 'game' ? store.me.value : null;
+    const initial: Profile =
+      me !== null
+        ? { nickname: me.nickname, presetId: me.avatar.presetId }
+        : (profile ?? { nickname: '', presetId: randomPreset(Math.random) });
     return (
       <ProfileScreen
-        initial={profile ?? { nickname: '', presetId: randomPreset(Math.random) }}
+        initial={initial}
         submitLabel={
           current.name === 'game' && profile === null
             ? STRINGS.profile.saveAndJoin
@@ -124,7 +131,12 @@ function Game(props: { gameKey: GameKey; profile: Profile; onEditProfile: () => 
       navigate('/', { replace: true });
       return;
     }
-    if (!store.resume(key)) store.joinGame(key, profile);
+    if (store.resume(key)) return;
+    // No login for this key. Joining needs an explicit act — opening the link or tapping Join /
+    // Host — never Back / Forward onto an old game URL (after LEFT / REMOVED that would silently
+    // make a new player, CLAUDE.md §5).
+    if (navigationCause.peek() === 'history') navigate('/', { replace: true });
+    else store.joinGame(key, profile);
   }, [key, open, profile, store]);
 
   const snapshot = store.snapshot.value;
@@ -135,9 +147,10 @@ function Game(props: { gameKey: GameKey; profile: Profile; onEditProfile: () => 
   const status = store.connectionStatus.value;
   useWakeLock(snapshot !== null && snapshot.phase !== 'ENDED');
 
+  // Replace, not push: Back must not land on this game's URL again.
   const goHome = () => {
     store.goHome();
-    navigate('/');
+    navigate('/', { replace: true });
   };
   const env = useMemo<ScreenEnv>(
     () => ({
@@ -223,7 +236,7 @@ function Game(props: { gameKey: GameKey; profile: Profile; onEditProfile: () => 
 export function PhaseScreen(props: {
   snapshot: Snapshot;
   onHome: () => void;
-  storage: Parameters<typeof LobbyScreen>[0]['storage'];
+  storage: Storage | null;
 }) {
   const { snapshot } = props;
   switch (snapshot.phase) {

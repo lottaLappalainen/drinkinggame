@@ -1,7 +1,7 @@
 // Screens without a game snapshot: Game Over (6), the exits (not found, left, removed, reclaimed,
 // opened somewhere else, please refresh), join problems (name taken / "That's me", full, invalid),
 // "That's me" waiting, and connecting / reconnecting / updating.
-import type { EndReason, SnapshotOf } from '../../shared/protocol';
+import type { EndReason } from '../../shared/protocol';
 import type { Exit, JoinError, ReclaimState } from '../store/types';
 import { STRINGS } from '../strings';
 import { Button, TextInput } from '../ui/Controls';
@@ -10,7 +10,7 @@ import { Center, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
 import { useState } from 'preact/hooks';
 import { validateNickname } from '../../shared/nickname';
-import { NICKNAME_MAX_GRAPHEMES } from '../../shared/constants';
+import { MAX_PLAYERS, NICKNAME_MAX_INPUT_CHARS } from '../../shared/constants';
 
 const END_REASON_TEXT: Record<EndReason, string> = {
   finished: STRINGS.ended.finished,
@@ -19,17 +19,13 @@ const END_REASON_TEXT: Record<EndReason, string> = {
 };
 
 /** Screen 6 — Game Over (G-47). The summary arrives with U3. */
-export function EndedScreen(props: {
-  reason: EndReason;
-  onHome: () => void;
-  snapshot?: SnapshotOf<'ENDED'>;
-}) {
+export function EndedScreen(props: { reason: EndReason; onHome: () => void }) {
   return (
     <Screen center label={STRINGS.ended.title}>
       <Center grow>
         <Stack gap="3" align="center">
           <Heading level={1} center>
-            {props.reason === 'updated' ? STRINGS.exit.refresh.title : STRINGS.ended.title}
+            {props.reason === 'updated' ? STRINGS.ended.updatedTitle : STRINGS.ended.title}
           </Heading>
           <Text variant="muted" center>
             {END_REASON_TEXT[props.reason]}
@@ -106,7 +102,7 @@ export function JoinProblemScreen(props: {
             {STRINGS.join.gameFull}
           </Heading>
           <Text variant="muted" center>
-            {STRINGS.join.gameFullBody}
+            {STRINGS.join.gameFullBody(MAX_PLAYERS)}
           </Text>
         </Center>
         <Button size="lg" block onClick={props.onHome}>
@@ -147,7 +143,7 @@ export function JoinProblemScreen(props: {
           <TextInput
             label={STRINGS.profile.nickname}
             value={name}
-            maxLength={NICKNAME_MAX_GRAPHEMES * 4}
+            maxLength={NICKNAME_MAX_INPUT_CHARS}
             enterKeyHint="go"
             onInput={setName}
           />

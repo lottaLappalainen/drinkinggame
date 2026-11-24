@@ -1,26 +1,27 @@
 // Screen 3 — Lobby (G-5, G-20…G-24, G-41, G-43, G-44): the key, link + QR (the main way to join),
 // the live player list, the settings (host changes them, everyone sees them), Start, Leave, and
 // the host's tools: remove a player offline ≥ 2 min, answer "That's me" requests.
-import { useState } from 'preact/hooks';
-import {
-  GAME_LENGTHS,
-  MIN_PLAYERS,
-  PODIUM_MIN_PLAYERS,
-  REMOVE_OFFLINE_MIN_MS,
-} from '../../shared/constants';
-import type { PublicPlayer, Settings, SnapshotOf } from '../../shared/protocol';
+import { GAME_LENGTHS, MIN_PLAYERS, PODIUM_MIN_PLAYERS } from '../../shared/constants';
+import type { Settings, SnapshotOf } from '../../shared/protocol';
 import { ADD_ON_CATEGORY_IDS, categoryById } from '../../shared/questionCategories';
 import { GAME_MODES, type GameMode } from '../../shared/spots';
 import type { Storage } from '../storage';
 import { STRINGS } from '../strings';
 import { Button, SegmentedControl, Toggle } from '../ui/Controls';
-import { Banner, Card, ConfirmDialog } from '../ui/Feedback';
+import { Banner, Card } from '../ui/Feedback';
 import { PlayerChip, PlayerList } from '../ui/Game';
 import { Center, Row, Screen, Stack } from '../ui/Layout';
 import { QrCode } from '../ui/QrCode';
 import { Heading, Text } from '../ui/Text';
-import { useEnv, useNowUntil } from './env';
-import { photoSource, ThemePicker } from './parts';
+import { useEnv } from './env';
+import {
+  LeaveButton,
+  photoSource,
+  ReclaimPrompts,
+  RemoveButton,
+  ThemePicker,
+  useCanRemove,
+} from './parts';
 
 export function LobbyScreen(props: {
   snapshot: SnapshotOf<'LOBBY'>;
@@ -34,21 +35,7 @@ export function LobbyScreen(props: {
   const isHost = snapshot.hostId === me;
   const active = snapshot.players.filter((p) => p.status === 'active');
   const source = photoSource(snapshot);
-  const [removing, setRemoving] = useState<PublicPlayer | null>(null);
-  const [leaving, setLeaving] = useState(false);
-
-  // The Remove button appears once a player has been offline for REMOVE_OFFLINE_MIN_MS (G-43):
-  // re-render exactly when the next one crosses that line.
-  const removableAt = active
-    .filter((p) => !p.online && p.offlineSince !== null)
-    .map((p) => (p.offlineSince ?? 0) + REMOVE_OFFLINE_MIN_MS);
-  const now = useNowUntil(nextAfter(env.serverNow(), removableAt));
-  const canRemove = (p: PublicPlayer) =>
-    isHost &&
-    p.playerId !== me &&
-    !p.online &&
-    p.offlineSince !== null &&
-    now - p.offlineSince >= REMOVE_OFFLINE_MIN_MS;
+  const canRemove = useCanRemove(snapshot);
 
   const settings = snapshot.settings;
   const change = (patch: Partial<Settings>) => env.actions.setSettings({ ...settings, ...patch });
@@ -80,31 +67,7 @@ export function LobbyScreen(props: {
         </Text>
       </Center>
 
-      {snapshot.reclaims.map((request) => {
-        const target = snapshot.players.find((p) => p.playerId === request.targetPlayerId);
-        return (
-          <Card key={request.requestId} tone="accent">
-            <Heading level={3}>
-              {STRINGS.lobby.reclaimTitle(target?.nickname ?? request.nickname)}
-            </Heading>
-            <Text>{STRINGS.lobby.reclaimBody}</Text>
-            <Row gap="2" justify="end" wrap>
-              <Button
-                variant="ghost"
-                onClick={() => env.actions.answerReclaim(request.requestId, false)}
-              >
-                {STRINGS.lobby.deny}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => env.actions.answerReclaim(request.requestId, true)}
-              >
-                {STRINGS.lobby.approve}
-              </Button>
-            </Row>
-          </Card>
-        );
-      })}
+      <ReclaimPrompts snapshot={snapshot} />
 
       <Stack gap="2">
         <Heading level={2}>{STRINGS.lobby.players(active.length)}</Heading>
@@ -118,18 +81,7 @@ export function LobbyScreen(props: {
                 source={source}
                 isHost={player.playerId === snapshot.hostId}
                 isYou={player.playerId === me}
-                action={
-                  canRemove(player) ? (
-                    <Button
-                      variant="ghost"
-                      onClick={() => {
-                        setRemoving(player);
-                      }}
-                    >
-                      {STRINGS.lobby.remove}
-                    </Button>
-                  ) : null
-                }
+                action={canRemove(player) ? <RemoveButton player={player} /> : null}
               />
             ),
           }))}
@@ -220,52 +172,10 @@ export function LobbyScreen(props: {
           <Button variant="ghost" onClick={env.actions.editProfile}>
             {STRINGS.profile.edit}
           </Button>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setLeaving(true);
-            }}
-          >
-            {STRINGS.lobby.leave}
-          </Button>
+          <LeaveButton />
         </Row>
         <ThemePicker storage={props.storage} />
       </Stack>
-
-      <ConfirmDialog
-        open={removing !== null}
-        title={STRINGS.lobby.removeTitle(removing?.nickname ?? '')}
-        message={STRINGS.lobby.removeBody}
-        confirmLabel={STRINGS.lobby.remove}
-        danger
-        onCancel={() => {
-          setRemoving(null);
-        }}
-        onConfirm={() => {
-          if (removing !== null) env.actions.removePlayer(removing.playerId);
-          setRemoving(null);
-        }}
-      />
-      <ConfirmDialog
-        open={leaving}
-        title={STRINGS.lobby.leaveTitle}
-        message={STRINGS.lobby.leaveBody}
-        confirmLabel={STRINGS.lobby.leave}
-        danger
-        onCancel={() => {
-          setLeaving(false);
-        }}
-        onConfirm={() => {
-          setLeaving(false);
-          env.actions.leave();
-        }}
-      />
     </Screen>
   );
-}
-
-/** The earliest moment after `now`, or null. */
-function nextAfter(now: number, moments: readonly number[]): number | null {
-  const future = moments.filter((at) => at > now);
-  return future.length === 0 ? null : Math.min(...future);
 }

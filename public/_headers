@@ -3,7 +3,7 @@
 
 # Every page and asset: security headers. The CSP allows only our own files; the one inline
 # script (the pre-paint theme script in index.html) is allowed by its sha256 — if that script
-# changes, test/client/theme.test.ts names the new hash to put here. Inline style ATTRIBUTES are
+# changes, test/design/designSystem.test.ts names the new hash to put here. Inline style ATTRIBUTES are
 # not allowed; setting element.style from code (drag transforms, CSS variables) is unaffected.
 /*
   X-Content-Type-Options: nosniff

@@ -12,6 +12,11 @@ export const PROTOCOL_VERSION = 2;
 export const MAX_PLAYERS = 25; // active players per game (G-13)
 export const MIN_PLAYERS = 3; // to start (G-21) and to continue without pausing (G-42)
 export const NICKNAME_MAX_GRAPHEMES = 16; // G-1 (unsure)
+/**
+ * Raw nickname input, in UTF-16 code units: generous, because one grapheme (an emoji, a flag) can
+ * be many code units. The real limit is NICKNAME_MAX_GRAPHEMES after cleaning (shared/nickname.ts).
+ */
+export const NICKNAME_MAX_INPUT_CHARS = NICKNAME_MAX_GRAPHEMES * 12;
 export const NICKNAME_MIN_GRAPHEMES = 1; // G-1
 
 // ── Game setup ──────────────────────────────────────────────────────────────

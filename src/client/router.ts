@@ -26,10 +26,19 @@ export function gamePath(key: GameKey): string {
 
 export const route = signal<Route>({ name: 'home' });
 
+/**
+ * How the current route was reached. A game URL reached by Back / Forward ('history') must never
+ * JOIN by itself — after LEFT / REMOVED the login is gone, and joining needs an explicit Join tap
+ * (CLAUDE.md §5). Opening a join link ('load') or tapping Join / Host in the app ('app') may.
+ */
+export type NavigationCause = 'load' | 'app' | 'history';
+export const navigationCause = signal<NavigationCause>('load');
+
 /** Called once from main.tsx. */
 export function initRouter(): void {
   route.value = parseRoute(location.pathname);
   window.addEventListener('popstate', () => {
+    navigationCause.value = 'history';
     route.value = parseRoute(location.pathname);
   });
 }
@@ -39,5 +48,6 @@ export function navigate(path: string, options: { replace?: boolean } = {}): voi
     if (options.replace === true) history.replaceState(null, '', path);
     else history.pushState(null, '', path);
   }
+  navigationCause.value = 'app';
   route.value = parseRoute(path);
 }

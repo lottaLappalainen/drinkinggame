@@ -30,17 +30,21 @@ function tokenValue(name: string, fallback: string): string {
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- the caller picks the element type its ref prop needs
 export function useFlip<T extends HTMLElement>(): { current: T | null } {
   const ref = useRef<T>(null);
-  const before = useRef(new Map<string, DOMRect>());
+  const before = useRef(new Map<string, { left: number; top: number }>());
 
   useLayoutEffect(() => {
     const list = ref.current;
     if (list === null || typeof list.animate !== 'function') return;
     const duration = tokenMs('--dur-base');
     const easing = tokenValue('--ease-out', 'ease-out');
-    const now = new Map<string, DOMRect>();
+    // Positions RELATIVE TO THE LIST: viewport positions would count scrolling as movement, so a
+    // scrolled list would slide every row on the next update.
+    const origin = list.getBoundingClientRect();
+    const now = new Map<string, { left: number; top: number }>();
     for (const element of Array.from(list.querySelectorAll<HTMLElement>('[data-flip]'))) {
       const key = element.dataset.flip ?? '';
-      const rect = element.getBoundingClientRect();
+      const box = element.getBoundingClientRect();
+      const rect = { left: box.left - origin.left, top: box.top - origin.top };
       now.set(key, rect);
       const old = before.current.get(key);
       if (old === undefined) {

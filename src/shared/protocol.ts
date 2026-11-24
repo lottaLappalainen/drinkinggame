@@ -16,7 +16,7 @@ import {
   GAME_KEY_LENGTH,
   GAME_LENGTHS,
   MAX_PLAYERS,
-  NICKNAME_MAX_GRAPHEMES,
+  NICKNAME_MAX_INPUT_CHARS,
   QUESTION_MAX_LENGTH,
 } from './constants';
 
@@ -50,7 +50,7 @@ export const TimestampSchema = v.pipe(v.number(), v.integer(), v.minValue(0));
 export const NicknameInputSchema = v.pipe(
   v.string(),
   v.minLength(1),
-  v.maxLength(NICKNAME_MAX_GRAPHEMES * 12), // generous: graphemes can be many code units
+  v.maxLength(NICKNAME_MAX_INPUT_CHARS), // generous: graphemes can be many code units
 );
 
 /** One of the ready-made avatars (shared/avatars.ts) — ids are never removed or renamed. */

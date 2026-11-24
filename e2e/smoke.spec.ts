@@ -60,6 +60,12 @@ test('three phones play a whole round', async ({ page: host, browser }, testInfo
   await expect(host.getByRole('heading', { name: '3 players' })).toBeVisible();
   await host.getByRole('button', { name: 'Start game' }).click();
 
+  // Mid-game, everyone has the game menu (Leave, the host's Remove / End game — G-41, G-43, G-46).
+  await aino.getByRole('button', { name: 'Game menu' }).first().click();
+  const menu = aino.getByRole('dialog', { name: 'Game menu' });
+  await expect(menu.getByRole('button', { name: 'Leave game' })).toBeVisible();
+  await menu.getByRole('button', { name: 'Dismiss' }).click();
+
   for (const phone of [host, aino, ville]) {
     // Intro (question only), then the answering screen.
     await expect(phone.getByRole('button', { name: 'Ready', exact: true })).toBeVisible({
@@ -101,4 +107,35 @@ test('the screen gallery renders every fixture without errors', async ({ page })
   await page.goto('/dev/ui');
   await expect(page.getByRole('heading', { name: 'dark' })).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test('Back after leaving lands on Home — it never joins the game again by itself', async ({
+  page: host,
+  browser,
+}, testInfo) => {
+  const key = await hostGame(host);
+  const aino = await newPhone(browser, testInfo);
+  await aino.goto('/');
+  await setProfile(aino, 'Aino');
+  await aino.getByLabel('Game key').fill(key);
+  await aino.getByRole('button', { name: 'Join', exact: true }).click();
+  await expect(aino.getByText('Waiting for the host to start…')).toBeVisible();
+  await expect(host.getByRole('heading', { name: '2 players' })).toBeVisible();
+
+  await aino.getByRole('button', { name: 'Leave game' }).click();
+  await aino.getByRole('dialog').getByRole('button', { name: 'Leave game' }).click();
+  await expect(aino.getByRole('button', { name: 'Host a game' }).last()).toBeVisible();
+  await expect(host.getByRole('heading', { name: '1 player' })).toBeVisible();
+
+  await aino.goBack();
+  await expect(aino.getByRole('button', { name: 'Host a game' }).last()).toBeVisible();
+  // Any history entry that still points at the game (e.g. from before leaving): Back onto it.
+  await aino.evaluate((path) => {
+    history.pushState(null, '', path);
+    history.pushState(null, '', '/');
+  }, `/g/${key}`);
+  await aino.goBack();
+  await expect(aino.getByRole('button', { name: 'Host a game' }).last()).toBeVisible();
+  await aino.waitForTimeout(1_000); // give a wrong auto-join time to happen
+  await expect(host.getByRole('heading', { name: '1 player' })).toBeVisible();
 });

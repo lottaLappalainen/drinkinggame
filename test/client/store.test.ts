@@ -394,3 +394,19 @@ describe('Home', () => {
     expect(app.sockets).toHaveLength(1);
   });
 });
+
+describe("the host's tools stay disabled until answered (no double taps)", () => {
+  it('Remove until playerLeft, a "That\'s me" answer until reclaimClosed', () => {
+    const app = joined();
+    expect(app.store.removePlayer(P.emma)).toBe(true);
+    expect(app.store.pending.value.has('removePlayer')).toBe(true);
+    app.socket.receive({ type: 'playerLeft', playerId: P.emma, reason: 'removed' });
+    expect(app.store.pending.value.has('removePlayer')).toBe(false);
+
+    const requestId = 'Req000000001' as never;
+    expect(app.store.answerReclaim(requestId, true)).toBe(true);
+    expect(app.store.pending.value.has('answerReclaim')).toBe(true);
+    app.socket.receive({ type: 'reclaimClosed', requestId });
+    expect(app.store.pending.value.has('answerReclaim')).toBe(false);
+  });
+});
