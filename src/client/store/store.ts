@@ -24,7 +24,8 @@ import type {
 } from '../../shared/protocol';
 import { createGame, type FetchLike } from '../net/api';
 import type { Clock } from '../net/clock';
-import type { Connection, ConnectionStatus } from '../net/connection';
+import type { Connection, ConnectionStatus, Timers } from '../net/connection';
+import { createPhotoUploader } from '../media/upload';
 import { reloadOnce } from '../net/reload';
 import type { GameEntry, Profile, Storage } from '../storage';
 import { errorOutcome } from './errors';
@@ -45,6 +46,8 @@ export type StoreDeps = {
   readonly clock: Clock;
   readonly storage: Storage;
   readonly fetch: FetchLike;
+  /** For photo-upload retries. */
+  readonly timers: Timers;
   readonly newToken: () => string;
   readonly reload: () => void;
   /** The phone's clock (epoch ms) — for the reload cap. */
@@ -89,6 +92,7 @@ export function createStore(deps: StoreDeps) {
   let welcomed = false;
   /** The player tapped Leave; LEFT / leftGame then just mean "done". */
   let leaving = false;
+  const photos = createPhotoUploader({ fetch: deps.fetch, timers: deps.timers });
 
   conn.onStatus((status) => {
     connectionStatus.value = status;
@@ -119,6 +123,24 @@ export function createStore(deps: StoreDeps) {
     pendingJoin = null;
     leaving = false;
     welcomed = false;
+    photos.cancel();
+  };
+
+  /**
+   * Send this phone's photo to the game (CLAUDE.md §6 "Avatars — photos"): automatically while the
+   * game has no photo of ours (any phase — a late joiner or an earlier failed upload), and after
+   * the player picked a new one in the lobby (`changed`; changing a photo is lobby-only, G-5).
+   */
+  const syncPhoto = (photo: string | null, changed: boolean) => {
+    const s = snapshot.value;
+    const key = gameKey.value;
+    if (s === null || key === null || entry === null || photo === null || s.phase === 'ENDED')
+      return;
+    const mine = s.players.find((p) => p.playerId === s.you.playerId);
+    if (mine?.status !== 'active') return;
+    const hasPhoto = mine.avatar.photoVersion !== null;
+    if (hasPhoto && !(changed && s.phase === 'LOBBY')) return;
+    photos.upload({ key, playerId: mine.playerId, token: entry.token }, photo);
   };
 
   /** A terminal answer: drop the token (it will never work again) and stop. */
@@ -201,6 +223,7 @@ export function createStore(deps: StoreDeps) {
     });
     // A Leave that never reached the server: the reconnect resumed us, so ask again.
     if (leaving) send({ type: 'leave' }, 'leave');
+    else syncPhoto(storage.loadPhoto(), false);
   };
 
   const onError = (message: ErrorMessage) => {
@@ -455,6 +478,14 @@ export function createStore(deps: StoreDeps) {
     // Plain requests
     updateProfile: (patch: { nickname?: string; presetId?: PresetId }): boolean => {
       return send({ type: 'updateProfile', ...patch });
+    },
+    /**
+     * The player picked a new photo (a data URL from media/photo.ts). Uploaded if the game may take
+     * it; otherwise it just waits in the saved profile for the next game. A removed photo (null)
+     * stays in this game — the protocol has no "delete my photo" (open question in PLAN.md).
+     */
+    photoChanged: (photo: string | null): void => {
+      syncPhoto(photo, true);
     },
     setSettings: (settings: Settings): boolean => {
       return send({ type: 'setSettings', settings }, 'setSettings');

@@ -1,0 +1,15 @@
+/* The file inputs stay in the page (a hidden `display: none` input can't be opened on some phones)
+   but take no space and can't be seen or tapped — the buttons open them. */
+.fileInput {
+  position: absolute;
+  inline-size: 0;
+  block-size: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.error {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-danger-text);
+}
