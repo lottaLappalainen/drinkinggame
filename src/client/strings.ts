@@ -17,6 +17,7 @@ export const STRINGS = {
   common: {
     cancel: 'Cancel',
     dismiss: 'Dismiss',
+    close: 'Close',
     home: 'Home',
     loading: 'Loading…',
     connecting: 'Connecting…',

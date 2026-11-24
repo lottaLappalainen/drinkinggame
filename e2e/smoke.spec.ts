@@ -64,7 +64,9 @@ test('three phones play a whole round', async ({ page: host, browser }, testInfo
   await aino.getByRole('button', { name: 'Game menu' }).first().click();
   const menu = aino.getByRole('dialog', { name: 'Game menu' });
   await expect(menu.getByRole('button', { name: 'Leave game' })).toBeVisible();
-  await menu.getByRole('button', { name: 'Dismiss' }).click();
+  await expect(menu.getByRole('button', { name: 'Dismiss' })).toHaveCount(0); // just the × now
+  await menu.getByRole('button', { name: 'Close' }).click();
+  await expect(menu).toBeHidden();
 
   for (const phone of [host, aino, ville]) {
     // Intro (question only), then the answering screen.

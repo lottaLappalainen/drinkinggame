@@ -43,6 +43,15 @@
   padding: var(--space-5);
 }
 
+/* Title row of a sheet: the × sits at the left, level with the heading. Pulled left by the
+   button's own padding so the × lines up with the sheet's content edge. */
+.dialogHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: calc(-1 * var(--space-3));
+}
+
 .banner {
   display: flex;
   align-items: center;

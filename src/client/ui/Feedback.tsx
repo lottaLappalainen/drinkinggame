@@ -2,7 +2,7 @@
 import type { ComponentChildren } from 'preact';
 import { useEffect, useRef } from 'preact/hooks';
 import { STRINGS } from '../strings';
-import { Button } from './Controls';
+import { Button, IconButton } from './Controls';
 import { cx } from './cx';
 import { Row } from './Layout';
 import { Heading, Text } from './Text';
@@ -25,12 +25,14 @@ export function Card(props: {
 
 /**
  * A modal sheet on the native <dialog> (focus trap, Esc, backdrop for free). `onClose` runs for
- * Esc too; the parent decides `open`.
+ * Esc too; the parent decides `open`. With a `title`, the sheet opens with a header row: a ×
+ * close button on the left, level with the heading — so the sheet needs no "Dismiss" button.
  */
 export function Modal(props: {
   open: boolean;
   label: string;
   onClose: () => void;
+  title?: string;
   children: ComponentChildren;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
@@ -50,7 +52,19 @@ export function Modal(props: {
         props.onClose();
       }}
     >
-      {props.open && <div class={styles.dialogBody}>{props.children}</div>}
+      {props.open && (
+        <div class={styles.dialogBody}>
+          {props.title !== undefined && (
+            <div class={styles.dialogHeader}>
+              <IconButton label={STRINGS.common.close} onClick={props.onClose}>
+                ×
+              </IconButton>
+              <Heading level={2}>{props.title}</Heading>
+            </div>
+          )}
+          {props.children}
+        </div>
+      )}
     </dialog>
   );
 }

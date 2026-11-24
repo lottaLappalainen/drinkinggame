@@ -253,11 +253,11 @@ export function GameMenu(props: { snapshot: Snapshot }) {
       <Modal
         open={open}
         label={STRINGS.ended.menu}
+        title={STRINGS.ended.players}
         onClose={() => {
           setOpen(false);
         }}
       >
-        <Heading level={2}>{STRINGS.ended.players}</Heading>
         <PlayerList
           label={STRINGS.ended.players}
           items={active.map((player) => ({
@@ -276,13 +276,6 @@ export function GameMenu(props: { snapshot: Snapshot }) {
         <Row gap="2" justify="between" wrap>
           <LeaveButton />
           <EndGameButton isHost={isHost} />
-          <Button
-            onClick={() => {
-              setOpen(false);
-            }}
-          >
-            {STRINGS.common.dismiss}
-          </Button>
         </Row>
       </Modal>
     </Row>
