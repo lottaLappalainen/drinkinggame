@@ -15,10 +15,12 @@ import { ClientMessageSchema, ServerMessageSchema } from '../../src/shared/proto
 
 const STATE_FINGERPRINTS: Readonly<Record<number, string>> = {
   1: 'aef42d30d8028781', // contracts before any game ran anywhere (only the echo page was deployed); categories, previousTokenHashes, MAX_CANDIDATES 6 and position-named reveal kinds added without a bump
+  2: '12074aa158aefd16', // 2026-11-24: game modes (settings.mode, round.spots), add-on categories default/spicy/luuppi, results places only (noVotes, no stats). The engine had been on staging since 2026-11-23, so every shape change needs a real bump from here on
 };
 
 const PROTOCOL_FINGERPRINTS: Readonly<Record<number, string>> = {
   1: '1ac544e07e9f68bb', // contracts before any phone ran a game (only the echo page was deployed); setSettings, join object, leftGame, question categories, MAX_CANDIDATES 6, reveal kinds bottom/third/second/top added without a bump
+  2: '16443b68ebb12e6d', // 2026-11-24: settings.mode + add-on categories, round.spots, candidates/ranking up to MAX_PLAYERS, results noVotes instead of stats, no questionCounts
 };
 
 /** A stable description of a Valibot schema's structure (kinds, keys, literals, checks). */

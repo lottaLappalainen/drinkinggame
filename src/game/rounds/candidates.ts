@@ -18,9 +18,12 @@ export function roundParticipants(state: GameState, roundId: number): PlayerId[]
 }
 
 /**
- * The players to rank (G-34): all of them while there are at most SHOW_ALL_UP_TO; with more,
- * exactly CANDIDATES_WHEN_MORE, the least-shown first with random ties (G-35) — so over a game
- * everyone appears about equally. (6 players → all 6, 7 players → 5: the drop is the rule, not a bug.)
+ * The players to rank (G-34). This and the lobby setting are the ONLY places that read the game
+ * mode (G-24); everything else follows the round's spot count (shared/spots.ts).
+ * - Podium: all of them.
+ * - Spotlight: all of them while there are at most SHOW_ALL_UP_TO; with more, exactly
+ *   CANDIDATES_WHEN_MORE, the least-shown first with random ties (G-35) — so over a game everyone
+ *   appears about equally. (6 players → all 6, 7 players → 5: the drop is the rule, not a bug.)
  *
  * The returned ORDER is random too, so nobody is favoured by their place in the list. Does not
  * touch `timesShown` — the caller counts a candidate as shown once the round starts.
@@ -31,7 +34,7 @@ export function selectCandidates(
   random: () => number,
 ): PlayerId[] {
   const pool = shuffle([...participants], random);
-  if (pool.length <= SHOW_ALL_UP_TO) return pool;
+  if (state.settings.mode === 'podium' || pool.length <= SHOW_ALL_UP_TO) return pool;
   const timesShown = (id: PlayerId) => state.players[id]?.timesShown ?? 0;
   // The pool is already in random order and sort() is stable, so equal counts stay random.
   const fairest = pool.sort((a, b) => timesShown(a) - timesShown(b)).slice(0, CANDIDATES_WHEN_MORE);

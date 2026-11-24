@@ -8,13 +8,14 @@
 // round; results without a ranking have no reveal steps) — impossible states don't type-check.
 import * as v from 'valibot';
 import { AVATAR_PRESET_IDS } from './avatars';
-import { CATEGORY_IDS } from './questionCategories';
+import { ADD_ON_CATEGORY_IDS, CATEGORY_IDS } from './questionCategories';
 import { LABEL_SET_IDS } from './questionLabels';
+import { GAME_MODES } from './spots';
 import {
   GAME_KEY_ALPHABET,
   GAME_KEY_LENGTH,
   GAME_LENGTHS,
-  MAX_CANDIDATES,
+  MAX_PLAYERS,
   NICKNAME_MAX_GRAPHEMES,
   QUESTION_MAX_LENGTH,
 } from './constants';
@@ -58,20 +59,26 @@ export const GameLengthSchema = v.picklist(GAME_LENGTHS);
 /** Question category (Q-7) — ids are never renamed or removed (shared/questionCategories.ts). */
 export const CategoryIdSchema = v.picklist(CATEGORY_IDS);
 
-/** A category selection (G-22): at least one, no duplicates. */
+/** A category the host can add to the always-on Default one (G-22). */
+export const AddOnCategoryIdSchema = v.picklist(ADD_ON_CATEGORY_IDS);
+
+/** The chosen add-ons (G-22): any of them, possibly none — Default is always played. No duplicates. */
 export const CategoriesSchema = v.pipe(
-  v.array(CategoryIdSchema),
-  v.minLength(1, 'Choose at least one category'),
+  v.array(AddOnCategoryIdSchema),
   v.check((ids) => new Set(ids).size === ids.length, 'Duplicate category'),
 );
+
+/** Spotlight (rank everyone shown) or Podium (everyone shown, fill the top 3) — G-24. */
+export const GameModeSchema = v.picklist(GAME_MODES);
 
 /** Label set naming the spot / reveal words (Q-8, shared/questionLabels.ts). */
 export const LabelSetIdSchema = v.picklist(LABEL_SET_IDS);
 
-/** The host's lobby settings (G-20, G-22) — locked at Start. */
+/** The host's lobby settings (G-20, G-22, G-24) — locked at Start. */
 export const SettingsSchema = v.strictObject({
   gameLength: GameLengthSchema,
   categories: CategoriesSchema,
+  mode: GameModeSchema,
 });
 
 export const RoundIdSchema = v.pipe(v.number(), v.integer(), v.minValue(1));
@@ -119,8 +126,13 @@ export const PublicRoundSchema = v.strictObject({
   number: v.pipe(v.number(), v.integer(), v.minValue(1)),
   total: GameLengthSchema,
   question: QuestionSchema,
-  /** Players to rank (G-34). */
-  candidates: v.pipe(v.array(PlayerIdSchema), v.minLength(1), v.maxLength(MAX_CANDIDATES)),
+  /** Players to rank (G-34): up to MAX_CANDIDATES in Spotlight, everyone in Podium. */
+  candidates: v.pipe(v.array(PlayerIdSchema), v.minLength(1), v.maxLength(MAX_PLAYERS)),
+  /**
+   * How many places each voter fills (G-24, shared/spots.ts): = candidates in Spotlight, the top 3
+   * in Podium. Fewer spots than candidates = a partial ranking ("No votes" group, no bottom step).
+   */
+  spots: v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(MAX_PLAYERS)),
   /** Players taking part / answering this round (ready list, G-38). */
   participants: v.array(PlayerIdSchema),
   answerStartsAt: TimestampSchema,
@@ -150,13 +162,6 @@ export const RankingEntrySchema = v.strictObject({
   place: v.pipe(v.number(), v.integer(), v.minValue(1)),
 });
 
-/** Only present with ≥ MIN_ANSWERS_FOR_STATS answers (S-6). Never raw points. */
-export const PlayerStatsSchema = v.strictObject({
-  playerId: PlayerIdSchema,
-  averageSpot: v.pipe(v.number(), v.minValue(1)),
-  firstVotes: v.pipe(v.number(), v.integer(), v.minValue(0)),
-});
-
 export const ResultOutcomeSchema = v.picklist([
   'ranked', // ≥ MIN_ANSWERS_FOR_RANKING answers
   'notEnoughAnswers', // 1 answer (S-7)
@@ -172,18 +177,26 @@ const RESULTS_COMMON = {
 };
 
 /**
- * Results of one round. Votes stay secret: places only, stats only with enough answers (S-6).
- * A variant on `outcome`: ranking / steps / stats exist ONLY for 'ranked'.
+ * Results of one round. Votes stay secret: PLACES ONLY — no points, no vote counts, no average spot
+ * (S-6). A variant on `outcome`: ranking / noVotes / steps exist ONLY for 'ranked'.
  */
 export const RoundResultsSchema = v.variant('outcome', [
   v.strictObject({
     ...RESULTS_COMMON,
     outcome: v.literal('ranked'),
-    /** Everyone shown in the question, best place first. */
+    /**
+     * Everyone placed by at least one voter, best place first. In Spotlight that is everyone shown.
+     * When `noVotes` is null, only the revealed places (1st–3rd) are listed (S-8 privacy).
+     */
     ranking: v.pipe(v.array(RankingEntrySchema), v.minLength(1)),
-    /** Reveal order: least likely → 3rd → 2nd → most likely (G-50). */
+    /**
+     * Shown players nobody placed (partial rankings only — always [] in Spotlight), labelled
+     * "No votes". null = withheld: a partial ranking with fewer than MIN_ANSWERS_FOR_NO_VOTES_LIST
+     * answers shows only the reveal (S-8).
+     */
+    noVotes: v.nullable(v.array(PlayerIdSchema)),
+    /** Reveal order: bottom → 3rd → 2nd → top; no bottom step in a partial ranking (G-50). */
     steps: v.pipe(v.array(RevealStepSchema), v.minLength(1)),
-    stats: v.nullable(v.array(PlayerStatsSchema)),
   }),
   v.strictObject({ ...RESULTS_COMMON, outcome: v.literal('notEnoughAnswers') }),
   v.strictObject({ ...RESULTS_COMMON, outcome: v.literal('nobodyAnswered') }),
@@ -222,15 +235,6 @@ export const SnapshotSchema = v.variant('phase', [
     ...SNAPSHOT_COMMON,
     phase: v.literal('LOBBY'),
     you: YouSchema,
-    /**
-     * Questions per category, for the host's chips and the lengths a selection can fill (G-22,
-     * G-23). Counts only — phones never see question texts in advance (G-33).
-     */
-    questionCounts: v.strictObject({
-      mild: v.pipe(v.number(), v.integer(), v.minValue(0)),
-      spicy: v.pipe(v.number(), v.integer(), v.minValue(0)),
-      personal: v.pipe(v.number(), v.integer(), v.minValue(0)),
-    }),
   }),
   v.strictObject({
     ...SNAPSHOT_COMMON,
@@ -278,7 +282,7 @@ const OTHER_ERROR_CODES = [
   'REMOVED', // this phone's player was removed (G-43)
   'REPLACED', // sent right before closing a replaced socket (G-18)
   'RECLAIMED', // this phone's token was superseded: "That's me" moved the player to another phone (G-44)
-  'NOT_ENOUGH_QUESTIONS', // start: the chosen categories can't fill the game length (G-23)
+  'NOT_ENOUGH_QUESTIONS', // start: the pool can't fill the game length (G-23 safety net — the bank keeps 35 Default questions)
   'CREATE_FAILED', // HTTP POST /api/games: no free game key found after the retries
 ] as const;
 
@@ -327,16 +331,16 @@ export const ClientMessageSchema = v.variant('type', [
     presetId: v.exactOptional(PresetIdSchema),
   }),
   /**
-   * Host, lobby only (G-20, G-22): the WHOLE desired settings (idempotent; mirrors
-   * settingsChanged). A selection too small for the length is accepted — the host may be changing
-   * both — and `start` refuses it (G-23).
+   * Host, lobby only (G-20, G-22, G-24): the WHOLE desired settings (idempotent; mirrors
+   * settingsChanged). Switching to Podium needs PODIUM_MIN_PLAYERS active players (NOT_ALLOWED).
    */
   v.strictObject({ type: v.literal('setSettings'), settings: SettingsSchema }),
   v.strictObject({ type: v.literal('start') }),
   v.strictObject({
     type: v.literal('submit'),
     roundId: RoundIdSchema,
-    ranking: v.pipe(v.array(PlayerIdSchema), v.minLength(1), v.maxLength(MAX_CANDIDATES)),
+    /** The top `round.spots` places, best first — distinct shown players (checked by the engine). */
+    ranking: v.pipe(v.array(PlayerIdSchema), v.minLength(1), v.maxLength(MAX_PLAYERS)),
   }),
   v.strictObject({ type: v.literal('advance'), roundId: RoundIdSchema }),
   v.strictObject({ type: v.literal('end') }),
@@ -484,7 +488,6 @@ export type ConnId = v.InferOutput<typeof ConnIdSchema>;
 export type GameKey = v.InferOutput<typeof GameKeySchema>;
 export type GameLength = v.InferOutput<typeof GameLengthSchema>;
 export type Settings = v.InferOutput<typeof SettingsSchema>;
-export type QuestionCounts = SnapshotOf<'LOBBY'>['questionCounts'];
 export type JoinProfile = v.InferOutput<typeof JoinProfileSchema>;
 export type Avatar = v.InferOutput<typeof AvatarSchema>;
 export type Phase = v.InferOutput<typeof PhaseSchema>;
@@ -496,7 +499,6 @@ export type PublicRound = v.InferOutput<typeof PublicRoundSchema>;
 export type RevealStepKind = v.InferOutput<typeof RevealStepKindSchema>;
 export type RevealStep = v.InferOutput<typeof RevealStepSchema>;
 export type RankingEntry = v.InferOutput<typeof RankingEntrySchema>;
-export type PlayerStats = v.InferOutput<typeof PlayerStatsSchema>;
 export type ResultOutcome = v.InferOutput<typeof ResultOutcomeSchema>;
 export type RoundResults = v.InferOutput<typeof RoundResultsSchema>;
 export type RankedResults = Extract<RoundResults, { outcome: 'ranked' }>;
@@ -520,5 +522,3 @@ export type MessageOf<M extends { type: string }, T extends M['type']> = Extract
 // Compile-time check: CLIENT_MESSAGE_TYPES lists exactly the client message types.
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 const _CLIENT_TYPES_COMPLETE: Same<(typeof CLIENT_MESSAGE_TYPES)[number], ClientMessageType> = true;
-// Compile-time check: questionCounts has exactly one entry per category.
-const _COUNTS_COMPLETE: Same<keyof QuestionCounts, (typeof CATEGORY_IDS)[number]> = true;

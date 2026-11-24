@@ -107,35 +107,28 @@ describe('starting the game (G-21, G-22, G-23, G-31)', () => {
     expect(game.state.questions).toEqual([]);
   });
 
-  it('categories that cannot fill the length refuse to start — and the host can fix it (G-23)', () => {
+  it('the longest game starts with no add-ons at all: Default alone fills it (G-23)', () => {
     const game = session(lobbyState());
     game.send(C.mikko, {
       type: 'setSettings',
-      settings: { gameLength: 25, categories: ['personal'] }, // 10 questions
-    });
-    const messages = sentTo(game.send(C.mikko, { type: 'start' }), C.mikko);
-    expect(messages).toEqual([{ type: 'error', code: 'NOT_ENOUGH_QUESTIONS', for: 'start' }]);
-    expect(game.state.phase).toBe('LOBBY');
-    expect(game.state.questions).toEqual([]);
-
-    game.send(C.mikko, {
-      type: 'setSettings',
-      settings: { gameLength: 25, categories: ['mild', 'spicy'] },
+      settings: { gameLength: 35, categories: [], mode: 'spotlight' },
     });
     game.send(C.mikko, { type: 'start' });
     expect(game.state.phase).toBe('QUESTION');
+    expect(game.state.questions).toHaveLength(35);
+    for (const question of game.state.questions) expect(question.category).toBe('default');
   });
 
-  it('only questions of the chosen categories are drawn (G-22)', () => {
+  it('only Default and the chosen add-ons are drawn (G-22)', () => {
     const game = session(lobbyState());
     game.send(C.mikko, {
       type: 'setSettings',
-      settings: { gameLength: 25, categories: ['mild', 'personal'] },
+      settings: { gameLength: 35, categories: ['luuppi'], mode: 'spotlight' },
     });
     game.send(C.mikko, { type: 'start' });
-    expect(game.state.questions).toHaveLength(25);
+    expect(game.state.questions).toHaveLength(35);
     for (const question of game.state.questions)
-      expect(['mild', 'personal']).toContain(question.category);
+      expect(['default', 'luuppi']).toContain(question.category);
   });
 
   it('a double-tapped Start changes nothing', () => {
@@ -385,7 +378,7 @@ describe("the host's Next and Finish (G-45)", () => {
     const game = session(lobbyState());
     game.send(C.mikko, {
       type: 'setSettings',
-      settings: { gameLength: 15, categories: ['mild', 'spicy'] },
+      settings: { gameLength: 15, categories: ['spicy'], mode: 'spotlight' },
     });
     game.send(C.mikko, { type: 'start' });
     const ids = new Set<string>();
@@ -406,7 +399,7 @@ describe("the host's Next and Finish (G-45)", () => {
     const game = session(lobbyState());
     game.send(C.mikko, {
       type: 'setSettings',
-      settings: { gameLength: 15, categories: ['mild', 'spicy'] },
+      settings: { gameLength: 15, categories: ['spicy'], mode: 'spotlight' },
     });
     game.send(C.mikko, { type: 'start' });
     playRound(game);
@@ -420,7 +413,10 @@ describe("the host's Next and Finish (G-45)", () => {
 
     // The last question: Finish is allowed even though the game is paused.
     const last = session(lobbyState());
-    last.send(C.mikko, { type: 'setSettings', settings: { gameLength: 15, categories: ['mild'] } });
+    last.send(C.mikko, {
+      type: 'setSettings',
+      settings: { gameLength: 15, categories: [], mode: 'spotlight' },
+    });
     last.send(C.mikko, { type: 'start' });
     for (let n = 1; n < 15; n++) {
       playRound(last);

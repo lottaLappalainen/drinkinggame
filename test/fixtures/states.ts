@@ -1,6 +1,6 @@
 // Example saved GameStates (the server-side shape). Validated against GameStateSchema and
 // checkInvariants by a test; Phase 3 tests start from these.
-import { QUESTION_BANK } from '../../src/game/questions';
+import { questionPool } from '../../src/game/questions';
 import {
   createGame,
   createPlayer,
@@ -69,11 +69,14 @@ export function questionState(): GameState {
   const endsAt = answerStartsAt + ROUND_MS;
   const ids = [P.mikko, P.aino, P.ville, P.sanna];
   state.phase = 'QUESTION';
-  state.questions = QUESTION_BANK.slice(0, state.settings.gameLength).map((q) => ({ ...q }));
+  state.questions = questionPool(state.settings.categories)
+    .slice(0, state.settings.gameLength)
+    .map((q) => ({ ...q }));
   state.round = {
     roundId: 1,
     index: 0,
     candidates: ids,
+    spots: ids.length,
     participants: ids,
     startedAt,
     answerStartsAt,

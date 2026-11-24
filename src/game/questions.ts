@@ -2,13 +2,13 @@
 // validation and clearly marked placeholders. Imported by the server only — never the client (G-33).
 import * as v from 'valibot';
 import { MIN_QUESTION_BANK_SIZE, QUESTION_MAX_LENGTH } from '../shared/constants';
+import { CategoryIdSchema, LabelSetIdSchema, type Question } from '../shared/protocol';
 import {
-  CategoryIdSchema,
-  LabelSetIdSchema,
-  type Question,
-  type QuestionCounts,
-} from '../shared/protocol';
-import type { CategoryId } from '../shared/questionCategories';
+  ALWAYS_ON_CATEGORY,
+  gameCategories,
+  type AddOnCategoryId,
+  type CategoryId,
+} from '../shared/questionCategories';
 import { DEFAULT_LABEL_SET, labelMismatch } from '../shared/questionLabels';
 import rawBank from '../questions/questions.json';
 
@@ -23,11 +23,17 @@ export const BankQuestionSchema = v.strictObject({
   labels: v.optional(LabelSetIdSchema, DEFAULT_LABEL_SET),
 });
 
+/**
+ * The always-on Default category alone must fill the longest game (G-23, G-32): then every length
+ * works with every add-on selection, and the lobby never has to disable a length.
+ */
 export const QuestionBankSchema = v.pipe(
   v.array(BankQuestionSchema),
-  v.minLength(
-    MIN_QUESTION_BANK_SIZE,
-    `The bank needs at least ${MIN_QUESTION_BANK_SIZE} questions (G-32)`,
+  v.check(
+    (bank) =>
+      bank.filter((question) => question.category === ALWAYS_ON_CATEGORY).length >=
+      MIN_QUESTION_BANK_SIZE,
+    `The bank needs at least ${MIN_QUESTION_BANK_SIZE} "${ALWAYS_ON_CATEGORY}" questions (G-32)`,
   ),
 );
 
@@ -77,29 +83,23 @@ export function getQuestion(id: string): Question | undefined {
   return BY_ID.get(id);
 }
 
-/** Questions in the chosen categories (G-22) — what a game's draw picks from. */
+/**
+ * What a game's draw picks from (G-22): every Default question plus those of the chosen add-ons.
+ * No quotas — each question in the pool is equally likely (G-31).
+ */
 export function questionPool(
-  categories: readonly CategoryId[],
+  addOns: readonly AddOnCategoryId[],
   bank: readonly Question[] = QUESTION_BANK,
 ): Question[] {
+  const categories: readonly CategoryId[] = gameCategories(addOns);
   return bank.filter((question) => categories.includes(question.category));
 }
 
-/** Questions per category, for the lobby chips and G-23 (counts only, never texts — G-33). */
-export function questionCounts(bank: readonly Question[] = QUESTION_BANK): QuestionCounts {
-  const counts: QuestionCounts = { mild: 0, spicy: 0, personal: 0 };
+/** Questions per category (tests and tooling — phones don't need counts any more, G-22). */
+export function questionCounts(
+  bank: readonly Question[] = QUESTION_BANK,
+): Record<CategoryId, number> {
+  const counts: Record<CategoryId, number> = { default: 0, spicy: 0, luuppi: 0 };
   for (const question of bank) counts[question.category] += 1;
   return counts;
 }
-
-/** G-23: can the chosen categories fill a game of this length? */
-export function poolCanFill(
-  categories: readonly CategoryId[],
-  gameLength: number,
-  counts: QuestionCounts = QUESTION_COUNTS,
-): boolean {
-  return categories.reduce((sum, id) => sum + counts[id], 0) >= gameLength;
-}
-
-/** Computed once: the bank never changes while the code runs. */
-export const QUESTION_COUNTS: QuestionCounts = questionCounts();

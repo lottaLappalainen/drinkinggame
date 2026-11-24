@@ -1,10 +1,13 @@
 // Categories (Q-7) and label sets (Q-8, Q-9): the shared modules phones and server both use.
 import { describe, expect, it } from 'vitest';
 import {
+  ADD_ON_CATEGORY_IDS,
+  ALWAYS_ON_CATEGORY,
   CATEGORIES,
   CATEGORY_IDS,
   DEFAULT_CATEGORIES,
   categoryById,
+  gameCategories,
   normalizeCategories,
 } from '../../src/shared/questionCategories';
 import {
@@ -21,12 +24,18 @@ describe('categories (Q-7, G-22)', () => {
     for (const id of CATEGORY_IDS) expect(categoryById(id).id).toBe(id);
   });
 
-  it('defaults to Mild + Spicy (Personal is opt-in)', () => {
-    expect(DEFAULT_CATEGORIES).toEqual(['mild', 'spicy']);
+  it('Default is always played; Spicy and Luuppi are add-ons, both off in a new lobby (G-22)', () => {
+    expect(ALWAYS_ON_CATEGORY).toBe('default');
+    expect([...ADD_ON_CATEGORY_IDS]).toEqual(
+      CATEGORY_IDS.filter((id) => id !== ALWAYS_ON_CATEGORY),
+    );
+    expect(DEFAULT_CATEGORIES).toEqual([]);
+    expect(gameCategories([])).toEqual(['default']);
+    expect(gameCategories(['luuppi', 'spicy'])).toEqual(['default', 'spicy', 'luuppi']);
   });
 
   it('normalizes a selection to display order without duplicates', () => {
-    expect(normalizeCategories(['personal', 'mild', 'personal'])).toEqual(['mild', 'personal']);
+    expect(normalizeCategories(['luuppi', 'spicy', 'luuppi'])).toEqual(['spicy', 'luuppi']);
   });
 });
 

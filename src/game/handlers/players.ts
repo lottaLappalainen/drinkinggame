@@ -9,6 +9,7 @@
 import { validateNickname, nameKey } from '../../shared/nickname';
 import {
   MAX_PLAYERS,
+  PODIUM_MIN_PLAYERS,
   PROTOCOL_VERSION,
   RECLAIM_TTL_MS,
   REMOVE_OFFLINE_MIN_MS,
@@ -256,21 +257,26 @@ export function handleUpdateProfile(
 }
 
 /**
- * Host, LOBBY only: game length and categories (G-20, G-22). Takes the whole settings object.
- * A selection that can't fill the length is accepted here (the host may be mid-way through
- * changing both); `start` refuses it (G-23).
+ * Host, LOBBY only: game length, add-on categories and game mode (G-20, G-22, G-24). Takes the
+ * whole settings object. Switching TO Podium needs PODIUM_MIN_PLAYERS active players; a Podium
+ * choice that is already set stays when players leave (never changed silently — `start` refuses
+ * it instead, and the host may still change other settings meanwhile).
  */
 export function handleSetSettings(
   draft: GameState,
   msg: EngineMessageOf<'setSettings'>,
-  _sender: Sender,
+  sender: Sender,
   _ctx: Ctx,
 ): Effect[] {
   const next: Settings = {
     gameLength: msg.settings.gameLength,
     categories: normalizeCategories(msg.settings.categories),
+    mode: msg.settings.mode,
   };
   if (JSON.stringify(next) === JSON.stringify(draft.settings)) return [];
+  const switchingToPodium = next.mode === 'podium' && draft.settings.mode !== 'podium';
+  if (switchingToPodium && activePlayers(draft).length < PODIUM_MIN_PLAYERS)
+    return [errorTo(sender.connId, 'NOT_ALLOWED', 'setSettings')];
   draft.settings = next;
   return [
     broadcast({ type: 'settingsChanged', settings: { ...next, categories: [...next.categories] } }),

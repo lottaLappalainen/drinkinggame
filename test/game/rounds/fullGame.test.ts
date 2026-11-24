@@ -126,18 +126,18 @@ describe('a whole game through the engine', () => {
     const seen = new Map<string, Snapshot>();
     const juho = conn('juho');
 
-    // Lobby: a fifth player joins, the host picks 15 questions from Mild + Spicy.
+    // Lobby: a fifth player joins, the host picks 15 questions and adds Spicy.
     game.hello(juho, 9, { nickname: 'Juho' });
     game.send(C.mikko, {
       type: 'setSettings',
-      settings: { gameLength: 15, categories: ['mild', 'spicy'] },
+      settings: { gameLength: 15, categories: ['spicy'], mode: 'spotlight' },
     });
     seen.set('lobby', buildSnapshot(game.state, P.mikko));
     everyoneSeesAValidGame(game);
     game.send(C.mikko, { type: 'start' });
     everyoneSeesAValidGame(game);
 
-    // Round 1: five answers → stats are allowed (≥ 5).
+    // Round 1: five answers.
     game.wait(QUESTION_INTRO_MS);
     seen.set('answering', buildSnapshot(game.state, P.aino));
     for (const c of [C.mikko, C.aino, C.ville, C.sanna, juho]) {

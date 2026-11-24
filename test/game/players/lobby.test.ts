@@ -1,7 +1,12 @@
 // 3A: profiles and settings in the lobby, leaving, removing, the pause flag, and the snapshot.
 import { describe, expect, it } from 'vitest';
 import { buildSnapshot } from '../../../src/game/handlers/players';
-import { MIN_PLAYERS, REMOVE_OFFLINE_MIN_MS } from '../../../src/shared/constants';
+import {
+  MIN_PLAYERS,
+  PODIUM_MIN_PLAYERS,
+  REMOVE_OFFLINE_MIN_MS,
+} from '../../../src/shared/constants';
+import type { Settings } from '../../../src/shared/protocol';
 import { C, P } from '../../fixtures/common';
 import { lobbyState, lobbyWithReclaimState, questionState } from '../../fixtures/states';
 import { broadcasts, conn, only, sentTo, session, types } from './session';
@@ -40,31 +45,33 @@ describe('own profile, lobby only (G-1, G-5, G-6)', () => {
     expect(game.send(C.aino, { type: 'updateProfile', presetId: 'cat' })).toEqual([]);
   });
 
-  it('the host sets length and categories (G-20, G-22); only the host (engine rule)', () => {
+  it('the host sets length and add-on categories (G-20, G-22); only the host (engine rule)', () => {
     const game = session(lobbyState());
-    const settings = { gameLength: 35, categories: ['personal', 'mild'] } as const;
     expect(
       broadcasts(
         game.send(C.mikko, {
           type: 'setSettings',
-          settings: { ...settings, categories: [...settings.categories] },
+          settings: { gameLength: 35, categories: ['luuppi', 'spicy'], mode: 'spotlight' },
         }),
       ),
     ).toEqual([
       // Stored and announced in display order.
-      { type: 'settingsChanged', settings: { gameLength: 35, categories: ['mild', 'personal'] } },
+      {
+        type: 'settingsChanged',
+        settings: { gameLength: 35, categories: ['spicy', 'luuppi'], mode: 'spotlight' },
+      },
     ]);
     // Same settings again (in any order) → nothing.
     expect(
       game.send(C.mikko, {
         type: 'setSettings',
-        settings: { gameLength: 35, categories: ['mild', 'personal'] },
+        settings: { gameLength: 35, categories: ['spicy', 'luuppi'], mode: 'spotlight' },
       }),
     ).toEqual([]);
     expect(
       game.send(C.aino, {
         type: 'setSettings',
-        settings: { gameLength: 15, categories: ['mild'] },
+        settings: { gameLength: 15, categories: [], mode: 'spotlight' },
       }),
     ).toEqual([
       {
@@ -75,23 +82,86 @@ describe('own profile, lobby only (G-1, G-5, G-6)', () => {
     ]);
   });
 
-  it('a selection too small for the length is accepted here — start refuses it (G-23)', () => {
+  it('no add-ons at all is fine: Default is always played (G-22)', () => {
     const game = session(lobbyState());
+    game.send(C.mikko, {
+      type: 'setSettings',
+      settings: { gameLength: 15, categories: ['spicy'], mode: 'spotlight' },
+    });
     const effects = game.send(C.mikko, {
       type: 'setSettings',
-      settings: { gameLength: 35, categories: ['personal'] }, // 10 placeholder questions
+      settings: { gameLength: 35, categories: [], mode: 'spotlight' },
     });
     expect(types(broadcasts(effects))).toEqual(['settingsChanged']);
-    expect(game.state.settings).toEqual({ gameLength: 35, categories: ['personal'] });
+    expect(game.state.settings).toEqual({ gameLength: 35, categories: [], mode: 'spotlight' });
   });
 
-  it('the lobby snapshot carries question counts per category, never texts (G-22, G-33)', () => {
+  it('a new lobby: 25 questions, no add-ons, Spotlight; no question counts or texts (G-22, G-33)', () => {
     const game = session(lobbyState());
     const welcome = only(sentTo(game.hello(conn('aino-2'), 2), conn('aino-2')), 'welcome');
     if (welcome.snapshot.phase !== 'LOBBY') throw new Error('expected the lobby');
-    expect(welcome.snapshot.questionCounts).toEqual({ mild: 20, spicy: 10, personal: 10 });
-    expect(welcome.snapshot.settings).toEqual({ gameLength: 25, categories: ['mild', 'spicy'] });
+    expect(welcome.snapshot.settings).toEqual({
+      gameLength: 25,
+      categories: [],
+      mode: 'spotlight',
+    });
+    expect(welcome.snapshot).not.toHaveProperty('questionCounts');
     expect(JSON.stringify(welcome)).not.toContain('placeholder');
+  });
+});
+
+describe('game mode (G-24)', () => {
+  const podium: Settings = { gameLength: 25, categories: [], mode: 'podium' };
+
+  /** The 4 lobby players plus joiners up to `total`. */
+  function lobbyOf(total: number) {
+    const game = session(lobbyState());
+    for (let n = 5; n <= total; n++)
+      game.hello(conn(`p${String(n)}`), 100 + n, { nickname: `P${String(n)}` });
+    return game;
+  }
+
+  it(`Podium can be chosen only with ${String(PODIUM_MIN_PLAYERS)}+ active players`, () => {
+    const six = lobbyOf(PODIUM_MIN_PLAYERS - 1);
+    expect(sentTo(six.send(C.mikko, { type: 'setSettings', settings: podium }), C.mikko)).toEqual([
+      { type: 'error', code: 'NOT_ALLOWED', for: 'setSettings' },
+    ]);
+    expect(six.state.settings.mode).toBe('spotlight');
+
+    const seven = lobbyOf(PODIUM_MIN_PLAYERS);
+    expect(
+      types(broadcasts(seven.send(C.mikko, { type: 'setSettings', settings: podium }))),
+    ).toEqual(['settingsChanged']);
+    expect(seven.state.settings.mode).toBe('podium');
+  });
+
+  it('players leaving never switch the mode back; Start is refused until there are 7 again', () => {
+    const game = lobbyOf(PODIUM_MIN_PLAYERS);
+    game.send(C.mikko, { type: 'setSettings', settings: podium });
+    const leaver = game.playerWithToken(100 + PODIUM_MIN_PLAYERS);
+    if (leaver === undefined) throw new Error('no joiner');
+    game.send(conn(`p${String(PODIUM_MIN_PLAYERS)}`), { type: 'leave' });
+    expect(game.state.settings.mode).toBe('podium'); // not changed silently
+
+    // Other settings can still change while Podium is set but unavailable.
+    expect(
+      types(
+        broadcasts(
+          game.send(C.mikko, { type: 'setSettings', settings: { ...podium, gameLength: 15 } }),
+        ),
+      ),
+    ).toEqual(['settingsChanged']);
+    expect(sentTo(game.send(C.mikko, { type: 'start' }), C.mikko)).toEqual([
+      { type: 'error', code: 'NOT_ALLOWED', for: 'start' },
+    ]);
+    expect(game.state.phase).toBe('LOBBY');
+
+    // A 7th player again → Start works without re-picking Podium.
+    game.hello(conn('again'), 999, { nickname: 'Again' });
+    game.send(C.mikko, { type: 'start' });
+    expect(game.state.phase).toBe('QUESTION');
+    expect(game.state.round?.spots).toBe(3);
+    expect(game.state.round?.candidates).toHaveLength(PODIUM_MIN_PLAYERS);
   });
 });
 
@@ -207,17 +277,7 @@ describe('the snapshot', () => {
       'welcome',
     );
     expect(Object.keys(welcome.snapshot).sort()).toEqual(
-      [
-        'gameId',
-        'hostId',
-        'key',
-        'phase',
-        'players',
-        'questionCounts',
-        'reclaims',
-        'settings',
-        'you',
-      ].sort(),
+      ['gameId', 'hostId', 'key', 'phase', 'players', 'reclaims', 'settings', 'you'].sort(),
     );
   });
 });

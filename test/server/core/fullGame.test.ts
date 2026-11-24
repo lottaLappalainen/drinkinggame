@@ -15,7 +15,10 @@ describe('a whole game over real sockets', () => {
     const ville = await Phone.hello(game.key, tokenFor(`ville-${game.key}`), 'Ville');
     await ville.next('welcome');
 
-    host.send({ type: 'setSettings', settings: { gameLength: 15, categories: ['mild', 'spicy'] } });
+    host.send({
+      type: 'setSettings',
+      settings: { gameLength: 15, categories: ['spicy'], mode: 'spotlight' },
+    });
     await aino.next('settingsChanged');
     host.send({ type: 'start' });
 

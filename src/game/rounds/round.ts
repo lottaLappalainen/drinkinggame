@@ -3,6 +3,7 @@
 import { ENDED_RETENTION_MS, QUESTION_INTRO_MS, ROUND_MS } from '../../shared/constants';
 import type { EndReason, RoundResults } from '../../shared/protocol';
 import { canEndEarly, readyCounter } from '../../shared/ready';
+import { isPartialRanking, spotsFor } from '../../shared/spots';
 import { roundCloseDeadline } from '../../shared/timeline';
 import { broadcast } from '../effects';
 import { entriesOf, keysOf } from '../ids';
@@ -30,6 +31,7 @@ export function startRound(draft: GameState, ctx: Ctx, roundId: number): Effect[
     roundId,
     index: roundId - 1,
     candidates,
+    spots: spotsFor(draft.settings.mode, candidates.length),
     participants,
     startedAt: ctx.now,
     answerStartsAt,
@@ -54,6 +56,7 @@ export function closeRound(draft: GameState, ctx: Ctx): Effect[] {
   const results = computeResults({
     roundId: round.roundId,
     candidates: round.candidates,
+    spots: round.spots,
     answers: round.answers,
     now: ctx.now,
   });
@@ -108,7 +111,7 @@ export function endGame(
 /**
  * Per-player counters kept for the drinking rules and the Game Over summary (decided later, U3):
  * answered / missed per participant; timesFirst / timesLast from the group ranking. If everyone is
- * tied at place 1, nobody is "last".
+ * tied at place 1, or the ranking is partial (Podium), nobody is "last".
  */
 function recordStats(draft: GameState, round: RoundState, results: RoundResults): void {
   for (const id of round.participants) {
@@ -118,11 +121,13 @@ function recordStats(draft: GameState, round: RoundState, results: RoundResults)
     else player.stats.missed += 1;
   }
   if (results.outcome !== 'ranked') return;
+  // In a partial ranking the last place is the "No votes" group — nobody is "last" there (G-50).
+  const partial = isPartialRanking(round.spots, round.candidates.length);
   const lastPlace = Math.max(...results.ranking.map((entry) => entry.place));
   for (const { playerId, place } of results.ranking) {
     const player = draft.players[playerId];
     if (!player) continue;
     if (place === 1) player.stats.timesFirst += 1;
-    if (place === lastPlace && lastPlace > 1) player.stats.timesLast += 1;
+    if (!partial && place === lastPlace && lastPlace > 1) player.stats.timesLast += 1;
   }
 }

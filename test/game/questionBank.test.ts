@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest';
 import {
   BankQuestionSchema,
   QUESTION_BANK,
+  QuestionBankSchema,
   findBankProblems,
   getQuestion,
   normalizeQuestionText,
-  poolCanFill,
   questionCounts,
   questionPool,
 } from '../../src/game/questions';
@@ -20,8 +20,27 @@ import {
 } from '../../src/shared/constants';
 
 describe('question bank (Q-1…Q-4, G-32)', () => {
-  it(`has at least ${MIN_QUESTION_BANK_SIZE} questions (the longest game)`, () => {
-    expect(QUESTION_BANK.length).toBeGreaterThanOrEqual(Math.max(...GAME_LENGTHS));
+  it(`has at least ${MIN_QUESTION_BANK_SIZE} Default questions — the longest game, with no add-ons (G-23, G-32)`, () => {
+    expect(MIN_QUESTION_BANK_SIZE).toBeGreaterThanOrEqual(Math.max(...GAME_LENGTHS));
+    expect(questionCounts().default).toBeGreaterThanOrEqual(MIN_QUESTION_BANK_SIZE);
+  });
+
+  it('refuses to load a bank with too few Default questions, however many add-on ones it has', () => {
+    const many = (category: 'default' | 'spicy', count: number) =>
+      Array.from({ length: count }, (_, i) => ({
+        id: `${category}${String(i)}`,
+        text: `Who is most likely to ${category} ${String(i)}?`,
+        category,
+      }));
+    expect(
+      v.safeParse(QuestionBankSchema, [
+        ...many('default', MIN_QUESTION_BANK_SIZE - 1),
+        ...many('spicy', 100),
+      ]).success,
+    ).toBe(false);
+    expect(v.safeParse(QuestionBankSchema, many('default', MIN_QUESTION_BANK_SIZE)).success).toBe(
+      true,
+    );
   });
 
   it('has unique ids and unique texts (ignoring case and punctuation)', () => {
@@ -49,9 +68,9 @@ describe('duplicate detection', () => {
     );
     expect(
       findBankProblems([
-        { id: 'a', text: 'Who is most likely to sing?', category: 'mild', labels: 'likely' },
-        { id: 'b', text: 'who is most likely to SING!', category: 'mild', labels: 'likely' },
-        { id: 'a', text: 'Who would you hug the most?', category: 'mild', labels: 'most' },
+        { id: 'a', text: 'Who is most likely to sing?', category: 'default', labels: 'likely' },
+        { id: 'b', text: 'who is most likely to SING!', category: 'default', labels: 'likely' },
+        { id: 'a', text: 'Who would you hug the most?', category: 'default', labels: 'most' },
       ]),
     ).toEqual([
       { kind: 'duplicateText', ids: ['a', 'b'] },
@@ -61,7 +80,12 @@ describe('duplicate detection', () => {
 });
 
 describe('categories and label sets (Q-7…Q-9, G-22, G-23)', () => {
-  const q = (id: string, text: string, labels: 'likely' | 'most', category = 'mild' as const) => ({
+  const q = (
+    id: string,
+    text: string,
+    labels: 'likely' | 'most',
+    category = 'default' as const,
+  ) => ({
     id,
     text,
     category,
@@ -74,14 +98,18 @@ describe('categories and label sets (Q-7…Q-9, G-22, G-23)', () => {
       expect(LABEL_SET_IDS).toContain(question.labels);
     }
     expect(
-      v.parse(BankQuestionSchema, { id: 'x', text: 'Who is most likely to?', category: 'mild' }),
+      v.parse(BankQuestionSchema, { id: 'x', text: 'Who is most likely to?', category: 'default' }),
     ).toMatchObject({ labels: 'likely' });
     expect(
       v.safeParse(BankQuestionSchema, { id: 'x', text: 'Who?', category: 'wild' }).success,
     ).toBe(false);
     expect(
-      v.safeParse(BankQuestionSchema, { id: 'x', text: 'Who?', category: 'mild', labels: 'best' })
-        .success,
+      v.safeParse(BankQuestionSchema, {
+        id: 'x',
+        text: 'Who?',
+        category: 'default',
+        labels: 'best',
+      }).success,
     ).toBe(false);
   });
 
@@ -99,15 +127,14 @@ describe('categories and label sets (Q-7…Q-9, G-22, G-23)', () => {
     ]);
   });
 
-  it('pools and counts by category; a selection can fill a length only with enough questions', () => {
+  it('the pool is always Default plus the chosen add-ons — add-ons only make it bigger (G-22)', () => {
     const counts = questionCounts();
-    expect(counts.mild + counts.spicy + counts.personal).toBe(QUESTION_BANK.length);
-    expect(questionPool(['spicy']).every((question) => question.category === 'spicy')).toBe(true);
-    expect(questionPool(['mild', 'spicy'])).toHaveLength(counts.mild + counts.spicy);
-    const small = { mild: 20, spicy: 10, personal: 10 };
-    expect(poolCanFill(['mild', 'spicy'], 25, small)).toBe(true);
-    expect(poolCanFill(['mild', 'spicy'], 35, small)).toBe(false);
-    expect(poolCanFill(['personal'], 15, small)).toBe(false);
+    expect(counts.default + counts.spicy + counts.luuppi).toBe(QUESTION_BANK.length);
+    expect(questionPool([]).every((question) => question.category === 'default')).toBe(true);
+    expect(questionPool([])).toHaveLength(counts.default);
+    expect(questionPool(['spicy'])).toHaveLength(counts.default + counts.spicy);
+    expect(questionPool(['luuppi'])).toHaveLength(counts.default + counts.luuppi);
+    expect(questionPool(['spicy', 'luuppi'])).toHaveLength(QUESTION_BANK.length);
   });
 
   it('the dev placeholders cover every category and both label sets', () => {

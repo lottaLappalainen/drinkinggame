@@ -89,6 +89,8 @@ export const RoundStateSchema = v.strictObject({
   /** Index into `questions`. */
   index: v.pipe(v.number(), v.integer(), v.minValue(0)),
   candidates: v.array(PlayerIdSchema),
+  /** Places each voter fills (G-24, shared/spots.ts spotsFor): fixed at round start. */
+  spots: v.pipe(v.number(), v.integer(), v.minValue(1)),
   participants: v.array(PlayerIdSchema),
   startedAt: TimestampSchema,
   answerStartsAt: TimestampSchema,
@@ -109,13 +111,13 @@ export const GameStateSchema = v.strictObject({
   paused: v.boolean(),
   /** null = host role vacant until the next active player connects. */
   hostId: v.nullable(PlayerIdSchema),
-  /** The host's lobby choices, locked at Start (G-20, G-22). */
+  /** The host's lobby choices, locked at Start (G-20, G-22, G-24). */
   settings: SettingsSchema,
   players: v.record(PlayerIdSchema, PlayerStateSchema),
   connections: v.record(ConnIdSchema, ConnectionStateSchema),
   reclaims: v.record(RequestIdSchema, ReclaimStateSchema),
   /**
-   * Drawn once at start from the chosen categories, no repeats (G-31, G-22) — stored with text,
+   * Drawn once at start from Default + the chosen add-ons, no repeats (G-31, G-22) — stored with text,
    * category and label set, so the running game never depends on the bank again: editing or
    * removing questions and deploying mid-party is safe. (~5 KB for 35 questions.)
    */
@@ -222,9 +224,13 @@ export function createUpdatedEndState(input: {
   };
 }
 
-/** A new lobby's settings (G-20, G-22 defaults). */
+/** A new lobby's settings (G-20, G-22, G-24 defaults). */
 export function defaultSettings(): GameState['settings'] {
-  return { gameLength: DEFAULT_GAME_LENGTH, categories: [...DEFAULT_CATEGORIES] };
+  return {
+    gameLength: DEFAULT_GAME_LENGTH,
+    categories: [...DEFAULT_CATEGORIES],
+    mode: 'spotlight',
+  };
 }
 
 /** Reconnect identity helper type re-exported for handler signatures. */

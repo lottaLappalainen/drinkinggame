@@ -31,13 +31,18 @@ export const LABEL_SETS: { readonly [K in LabelSetId]: LabelSet } = {
   most: { top: 'Most', second: '2nd most', third: '3rd most', bottom: 'Least' },
 };
 
+/** The group of players nobody placed (a partial ranking, G-24 / G-50) — never "Least likely". */
+export const NO_VOTES_LABEL = 'No votes';
+
 /**
  * The words for one place — the ONLY function that turns a place into text (ranking-spot captions,
  * every reveal step, the full ranking). `lastPlace` = the place number of the bottom group; it wins
  * over 2nd/3rd (with 3 players, the last place is "Least likely", not "3rd most likely" — G-50).
+ * Pass `null` when the ranking is partial (shared/spots.ts `isPartialRanking`): then nobody placed
+ * is "least", and the unplaced group is labelled NO_VOTES_LABEL by the caller.
  * Places between 3rd and the last are plain ordinals.
  */
-export function placeLabel(set: LabelSetId, place: number, lastPlace: number): string {
+export function placeLabel(set: LabelSetId, place: number, lastPlace: number | null): string {
   const labels = LABEL_SETS[set];
   if (place === 1) return labels.top;
   if (place === lastPlace) return labels.bottom;

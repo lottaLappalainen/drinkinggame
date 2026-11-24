@@ -8,11 +8,13 @@
 import {
   MAX_CANDIDATES,
   MAX_PLAYERS,
+  MIN_ANSWERS_FOR_NO_VOTES_LIST,
   MIN_ANSWERS_FOR_RANKING,
-  MIN_ANSWERS_FOR_STATS,
 } from '../shared/constants';
 import type { PlayerId, RoundResults, Snapshot } from '../shared/protocol';
+import { gameCategories, type CategoryId } from '../shared/questionCategories';
 import { revealEndsAt } from '../shared/reveal';
+import { isPartialRanking, spotsFor } from '../shared/spots';
 import { entriesOf } from './ids';
 import type { GameState, RoundState } from './stateSchema';
 
@@ -93,8 +95,9 @@ export function checkInvariants(state: GameState): string[] {
       );
     const ids = state.questions.map((q) => q.id);
     if (new Set(ids).size !== ids.length) fail('a question was drawn twice (G-31)');
+    const categories: readonly CategoryId[] = gameCategories(state.settings.categories);
     for (const question of state.questions)
-      if (!state.settings.categories.includes(question.category))
+      if (!categories.includes(question.category))
         fail(`question ${question.id} is from a category that wasn't chosen (G-22)`);
   }
 
@@ -128,8 +131,12 @@ function checkRound(state: GameState, round: RoundState): string[] {
   if (round.roundId !== round.index + 1) fail('round.roundId must be round.index + 1');
   // Candidates stay rankable for their round even if they leave meanwhile (G-41) → they must
   // exist, but needn't be active.
-  if (round.candidates.length < 1 || round.candidates.length > MAX_CANDIDATES)
-    fail(`${round.candidates.length} candidates (allowed 1…MAX_CANDIDATES)`);
+  // Spotlight shows at most MAX_CANDIDATES; Podium shows every participant (G-34, G-24).
+  const maxCandidates = state.settings.mode === 'podium' ? MAX_PLAYERS : MAX_CANDIDATES;
+  if (round.candidates.length < 1 || round.candidates.length > maxCandidates)
+    fail(`${round.candidates.length} candidates (allowed 1…${maxCandidates})`);
+  if (round.spots !== spotsFor(state.settings.mode, round.candidates.length))
+    fail(`round.spots ${round.spots} does not match the mode (G-24)`);
   if (new Set(round.candidates).size !== round.candidates.length) fail('duplicate candidate');
   // Everyone ranked is also someone who answers (candidates are chosen from the participants, G-34).
   for (const id of round.candidates)
@@ -139,25 +146,32 @@ function checkRound(state: GameState, round: RoundState): string[] {
   if (!(round.startedAt <= round.answerStartsAt && round.answerStartsAt < round.endsAt))
     fail('round timeline out of order');
 
-  const candidates = [...round.candidates].sort().join();
   for (const [playerId, ranking] of entriesOf(round.answers)) {
     if (!round.participants.includes(playerId))
       fail(`answer from ${playerId}, who is not a participant`);
-    if ([...ranking].sort().join() !== candidates)
-      fail(`answer from ${playerId} is not a ranking of exactly the candidates (G-36)`);
+    if (
+      ranking.length !== round.spots ||
+      new Set(ranking).size !== ranking.length ||
+      !ranking.every((id) => round.candidates.includes(id))
+    )
+      fail(`answer from ${playerId} does not fill exactly the round's spots (G-36)`);
   }
 
   if (round.results !== null) {
     if (round.results.roundId !== round.roundId) fail('results belong to another round');
     if (round.results.answerCount !== Object.keys(round.answers).length)
       fail('results.answerCount differs from the number of answers');
-    problems.push(...checkResults(round.results, round.candidates));
+    problems.push(...checkResults(round.results, round.candidates, round.spots));
   }
   return problems;
 }
 
 /** Rules for results — shared by the saved state and the snapshot checks. */
-function checkResults(results: RoundResults, candidates: readonly PlayerId[]): string[] {
+function checkResults(
+  results: RoundResults,
+  candidates: readonly PlayerId[],
+  spots: number,
+): string[] {
   const problems: string[] = [];
   const fail = (message: string) => problems.push(message);
   switch (results.outcome) {
@@ -165,14 +179,29 @@ function checkResults(results: RoundResults, candidates: readonly PlayerId[]): s
       if (results.answerCount < MIN_ANSWERS_FOR_RANKING) fail('ranked with too few answers (S-7)');
       if (results.revealEndsAt !== revealEndsAt(results.revealStartsAt, results.steps.length))
         fail('revealEndsAt does not match the reveal steps (G-45)');
+      const partial = isPartialRanking(spots, candidates.length);
       const ranked = results.ranking.map((e) => e.playerId);
-      if ([...ranked].sort().join() !== [...candidates].sort().join())
-        fail('ranking must list every candidate exactly once');
+      const listed = [...ranked, ...(results.noVotes ?? [])];
+      if (new Set(listed).size !== listed.length) fail('a player is listed twice in the results');
+      for (const id of listed)
+        if (!candidates.includes(id)) fail(`results name non-candidate ${id}`);
+      if (results.noVotes === null) {
+        // S-8: withheld only for a partial ranking with few answers; then only revealed places.
+        if (!partial || results.answerCount >= MIN_ANSWERS_FOR_NO_VOTES_LIST)
+          fail('noVotes withheld without reason (S-8)');
+        const revealed = new Set(results.steps.flatMap((step) => step.playerIds));
+        if (!ranked.every((id) => revealed.has(id)))
+          fail('withheld results list a place that was not revealed (S-8)');
+      } else if (listed.length !== candidates.length) {
+        fail('ranking + noVotes must list every candidate exactly once');
+      }
+      if (!partial && (results.noVotes ?? []).length > 0)
+        fail('a full ranking has a "No votes" group');
+      if (partial && results.steps.some((step) => step.kind === 'bottom'))
+        fail('a partial ranking reveals a bottom step (G-50)');
       for (const step of results.steps)
         for (const id of step.playerIds)
-          if (!candidates.includes(id)) fail(`reveal step names non-candidate ${id}`);
-      if (results.stats !== null && results.answerCount < MIN_ANSWERS_FOR_STATS)
-        fail('stats shown with fewer than MIN_ANSWERS_FOR_STATS answers (S-6)');
+          if (!ranked.includes(id)) fail(`reveal step names unranked player ${id}`);
       break;
     }
     case 'notEnoughAnswers':
@@ -209,13 +238,18 @@ export function checkSnapshotInvariants(snapshot: Snapshot): string[] {
     if (round.endsAt <= round.answerStartsAt) fail('round ends before answering starts');
     if (round.number < 1 || round.number > round.total)
       fail(`question number ${round.number} outside 1…${round.total}`);
-    if (!snapshot.settings.categories.includes(round.question.category))
+    const categories: readonly CategoryId[] = gameCategories(snapshot.settings.categories);
+    if (!categories.includes(round.question.category))
       fail(`question from a category that wasn't chosen (G-22)`);
+    if (round.spots !== spotsFor(snapshot.settings.mode, round.candidates.length))
+      fail('round.spots does not match the mode (G-24)');
   }
   if (snapshot.phase === 'RESULTS') {
     if (snapshot.results.roundId !== snapshot.round.roundId)
       fail('results belong to another round');
-    problems.push(...checkResults(snapshot.results, snapshot.round.candidates));
+    problems.push(
+      ...checkResults(snapshot.results, snapshot.round.candidates, snapshot.round.spots),
+    );
   }
   return problems;
 }

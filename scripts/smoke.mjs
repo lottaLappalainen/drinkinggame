@@ -7,10 +7,18 @@
 // results) and the host ends the game. Exit code 0 = the whole server path works.
 // Uses Node's built-in WebSocket and fetch; no dependencies.
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 const base = (process.argv[2] ?? 'http://localhost:5173').replace(/\/$/, '');
 const wsBase = base.replace(/^http/, 'ws');
-const PROTOCOL_VERSION = 1; // keep in step with src/shared/constants.ts
+// Read from the source, so a version bump can never leave this script behind.
+const PROTOCOL_VERSION = Number(
+  /PROTOCOL_VERSION = (\d+)/.exec(
+    readFileSync(new URL('../src/shared/constants.ts', import.meta.url), 'utf8'),
+  )?.[1],
+);
+if (!Number.isInteger(PROTOCOL_VERSION))
+  throw new Error('PROTOCOL_VERSION not found in constants.ts');
 const TIMEOUT_MS = 15_000;
 
 const token = () => randomBytes(24).toString('base64url');

@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { detectPhotoType } from '../../../src/server/photos/photoStore';
 import type { GameObject } from '../../../src/server/GameObject';
 import { MAX_PHOTO_BYTES } from '../../../src/shared/constants';
-import type { GameKey, HttpErrorResponse, PlayerId } from '../../../src/shared/protocol';
+import type { HttpErrorResponse } from '../../../src/shared/protocol';
 import { BASE, Phone, createGame, setClock, storedState, stub, tokenFor } from '../core/phone';
 
 /** A minimal JPEG / WebP: the right first bytes, then filler. */
@@ -186,7 +186,7 @@ describe('downloading a photo', () => {
 
     // The same key, claimed again by a new game: the old URL (old game id) is a 404.
     const reclaimed = await stub(game.key).claim({
-      key: game.key as GameKey,
+      key: game.key,
       nickname: 'New host',
       presetId: 'owl',
       token: tokenFor('new-host'),
@@ -194,9 +194,7 @@ describe('downloading a photo', () => {
     expect(reclaimed.ok).toBe(true);
     expect((await download(game.key, game.gameId, game.ainoId, 1)).status).toBe(404);
     if (reclaimed.ok) {
-      expect((await download(game.key, reclaimed.gameId, game.ainoId as PlayerId, 1)).status).toBe(
-        404,
-      );
+      expect((await download(game.key, reclaimed.gameId, game.ainoId, 1)).status).toBe(404);
     }
   });
 });

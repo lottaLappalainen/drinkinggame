@@ -2,7 +2,6 @@
 // Never answers, tokens or token hashes (CLAUDE.md §5); results only as computed (S-6).
 import type { PlayerId, PublicPlayer, PublicRound, Snapshot } from '../../shared/protocol';
 import { keysOf } from '../ids';
-import { QUESTION_COUNTS } from '../questions';
 import type { GameState, PlayerState, RoundState } from '../stateSchema';
 import { pendingReclaims } from './reclaims';
 
@@ -46,6 +45,7 @@ export function publicRound(state: GameState, round: RoundState): PublicRound {
     total: state.settings.gameLength,
     question: { ...question },
     candidates: [...round.candidates],
+    spots: round.spots,
     participants: [...round.participants],
     answerStartsAt: round.answerStartsAt,
     endsAt: round.endsAt,
@@ -63,7 +63,7 @@ export function buildSnapshot(state: GameState, viewer: PlayerId): Snapshot {
     key: state.key,
     gameId: state.gameId,
     hostId: state.hostId,
-    settings: { gameLength: state.settings.gameLength, categories: [...state.settings.categories] },
+    settings: { ...state.settings, categories: [...state.settings.categories] },
     players: publicPlayers(state),
     you: { playerId: viewer },
     reclaims: viewer === state.hostId ? pendingReclaims(state) : [],
@@ -71,8 +71,7 @@ export function buildSnapshot(state: GameState, viewer: PlayerId): Snapshot {
   const { round } = state;
   switch (state.phase) {
     case 'LOBBY':
-      // Counts only (G-22, G-23) — never texts (G-33).
-      return { ...common, phase: 'LOBBY', questionCounts: { ...QUESTION_COUNTS } };
+      return { ...common, phase: 'LOBBY' };
     case 'QUESTION':
       if (round === null) throw new Error('QUESTION without a round');
       return {

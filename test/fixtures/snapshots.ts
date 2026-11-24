@@ -27,6 +27,8 @@ import {
   REQUEST_ID,
   REVEAL_STARTS_AT,
   T0,
+  guestId,
+  manyPlayers,
   player,
   preset,
   sixPlayers,
@@ -45,17 +47,14 @@ export type ScreenFixture = {
 const ROUND_STARTED_AT = T0 + 10_000;
 
 /** Fields every phase has. */
-type Common = Omit<SnapshotOf<'LOBBY'>, 'phase' | 'questionCounts'>;
-
-/** Matches the placeholder bank (20 mild, 10 spicy, 10 personal). */
-const QUESTION_COUNTS = { mild: 20, spicy: 10, personal: 10 } as const;
+type Common = Omit<SnapshotOf<'LOBBY'>, 'phase'>;
 
 function common(overrides: Partial<Common> = {}): Common {
   return {
     key: GAME_KEY,
     gameId: GAME_ID,
     hostId: P.mikko,
-    settings: { gameLength: 25, categories: ['mild', 'spicy'] },
+    settings: { gameLength: 25, categories: ['spicy'], mode: 'spotlight' },
     players: sixPlayers(),
     you: { playerId: P.mikko },
     reclaims: [],
@@ -64,19 +63,20 @@ function common(overrides: Partial<Common> = {}): Common {
 }
 
 function lobby(overrides: Partial<Common> = {}): SnapshotOf<'LOBBY'> {
-  return { ...common(overrides), phase: 'LOBBY', questionCounts: { ...QUESTION_COUNTS } };
+  return { ...common(overrides), phase: 'LOBBY' };
 }
 
+/** `spots` follows the candidates (Spotlight) unless overridden (Podium: 3). */
 function round(overrides: Partial<PublicRound> = {}): PublicRound {
   const answerStartsAt = ROUND_STARTED_AT + QUESTION_INTRO_MS;
-  return {
+  const base: Omit<PublicRound, 'spots'> = {
     roundId: 7,
     number: 7,
     total: 25,
     question: {
       id: 'q0007',
       text: '[placeholder 07] Who is most likely to …?',
-      category: 'mild',
+      category: 'default',
       labels: 'likely',
     },
     candidates: [P.mikko, P.aino, P.ville, P.sanna, P.juho, P.emma],
@@ -84,8 +84,9 @@ function round(overrides: Partial<PublicRound> = {}): PublicRound {
     answerStartsAt,
     endsAt: answerStartsAt + ROUND_MS,
     ready: [],
-    ...overrides,
   };
+  const merged = { ...base, ...overrides };
+  return { ...merged, spots: overrides.spots ?? merged.candidates.length };
 }
 
 function question(
@@ -169,20 +170,13 @@ function rankedSix(roundId: number): RankedResults {
       { kind: 'second', place: 2, playerIds: [P.aino, P.ville], rule: null },
       { kind: 'top', place: 1, playerIds: [P.juho], rule: null },
     ],
-    // 5 answers ≥ MIN_ANSWERS_FOR_STATS → stats are included (S-6)
-    stats: [
-      { playerId: P.juho, averageSpot: 1.4, firstVotes: 4 },
-      { playerId: P.aino, averageSpot: 2.6, firstVotes: 1 },
-      { playerId: P.ville, averageSpot: 2.6, firstVotes: 0 },
-      { playerId: P.sanna, averageSpot: 4, firstVotes: 0 },
-      { playerId: P.mikko, averageSpot: 4.8, firstVotes: 0 },
-      { playerId: P.emma, averageSpot: 5.6, firstVotes: 0 },
-    ],
+    // A full ranking: everyone is placed, so nobody is in the "No votes" group.
+    noVotes: [],
   });
 }
 const RANKED = rankedSix(7);
 
-// Tie at first place; only 3 answers → no stats.
+// Tie at first place.
 const TIE_FIRST = ranked({
   roundId: 7,
   answerCount: 3,
@@ -197,7 +191,7 @@ const TIE_FIRST = ranked({
     { kind: 'third', place: 3, playerIds: [P.mikko], rule: null },
     { kind: 'top', place: 1, playerIds: [P.aino, P.sanna], rule: null },
   ],
-  stats: null,
+  noVotes: [],
 });
 
 // Three candidates: "least likely" IS 3rd → steps least likely → 2nd → most likely (G-50).
@@ -214,7 +208,61 @@ const THREE_CANDIDATES = ranked({
     { kind: 'second', place: 2, playerIds: [P.mikko], rule: null },
     { kind: 'top', place: 1, playerIds: [P.ville], rule: null },
   ],
-  stats: null,
+  noVotes: [],
+});
+
+// ── Podium (G-24): everyone shown, each voter fills the top 3 ────────────────
+
+const PODIUM_SETTINGS = {
+  gameLength: 25,
+  categories: [],
+  mode: 'podium',
+} as const satisfies Common['settings'];
+const TWELVE = manyPlayers(12);
+const podiumRound = (ids: readonly PlayerId[]): Partial<PublicRound> => ({
+  candidates: [...ids],
+  participants: [...ids],
+  spots: 3,
+});
+
+function podiumResults(res: RoundResults, players: PublicPlayer[] = TWELVE): SnapshotOf<'RESULTS'> {
+  return resultsSnapshot(res, podiumRound(players.map((p) => p.playerId)), {
+    players,
+    settings: PODIUM_SETTINGS,
+  });
+}
+
+// 6 answers: five players got points, seven nobody placed ("No votes"). No bottom step (G-50).
+const PODIUM_RANKED = ranked({
+  roundId: 7,
+  answerCount: 6,
+  ranking: [
+    { playerId: P.juho, place: 1 },
+    { playerId: P.aino, place: 2 },
+    { playerId: P.ville, place: 3 },
+    { playerId: guestId(7), place: 3 },
+    { playerId: P.sanna, place: 5 },
+  ],
+  noVotes: [P.mikko, P.emma, guestId(8), guestId(9), guestId(10), guestId(11), guestId(12)],
+  steps: [
+    { kind: 'third', place: 3, playerIds: [P.ville, guestId(7)], rule: null },
+    { kind: 'second', place: 2, playerIds: [P.aino], rule: null },
+    { kind: 'top', place: 1, playerIds: [P.juho], rule: null },
+  ],
+});
+
+// 3 answers with no overlapping picks: three-way ties at every place, and fewer than 5 answers
+// → only the revealed top place is sent, no "No votes" group (S-8).
+const PODIUM_WITHHELD = ranked({
+  roundId: 7,
+  answerCount: 3,
+  ranking: [
+    { playerId: P.juho, place: 1 },
+    { playerId: P.aino, place: 1 },
+    { playerId: guestId(9), place: 1 },
+  ],
+  noVotes: null,
+  steps: [{ kind: 'top', place: 1, playerIds: [P.juho, P.aino, guestId(9)], rule: null }],
 });
 
 const RANKED_SNAPSHOT = resultsSnapshot(RANKED);
@@ -264,10 +312,25 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
     snapshot: lobby({ hostId: null, you: { playerId: P.aino } }),
   },
   {
-    name: 'lobby-not-enough-questions',
-    screen: '3 Lobby — only Personal chosen: 25 and 35 disabled, Start disabled (G-22, G-23)',
+    name: 'lobby-add-ons',
+    screen: '3 Lobby — Spicy and Luuppi both on (G-22)',
     now: T0,
-    snapshot: lobby({ settings: { gameLength: 25, categories: ['personal'] } }),
+    snapshot: lobby({
+      settings: { gameLength: 35, categories: ['spicy', 'luuppi'], mode: 'spotlight' },
+    }),
+  },
+  {
+    name: 'lobby-podium',
+    screen: '3 Lobby — 12 players, Podium chosen (G-24: the switch is enabled from 7 players)',
+    now: T0,
+    snapshot: lobby({ players: manyPlayers(12), settings: PODIUM_SETTINGS }),
+  },
+  {
+    name: 'lobby-podium-start-blocked',
+    screen:
+      '3 Lobby — Podium chosen, then players left: 6 < 7, Start disabled with the reason (G-24)',
+    now: T0,
+    snapshot: lobby({ settings: PODIUM_SETTINGS }),
   },
 
   // 4a–4c. Question round
@@ -298,6 +361,19 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
       },
       AINO_WAITING,
     ),
+  },
+  {
+    name: 'question-podium-25',
+    screen:
+      '4b Answering — Podium with 25 players: 3 spots above a pick list of everyone (G-24, G-36)',
+    now: ANSWERING_AT,
+    snapshot: {
+      ...common({ players: manyPlayers(25), settings: PODIUM_SETTINGS }),
+      phase: 'QUESTION',
+      paused: false,
+      you: AINO_WAITING,
+      round: round(podiumRound(manyPlayers(25).map((p) => p.playerId))),
+    },
   },
   {
     name: 'question-answering-last-seconds',
@@ -417,6 +493,24 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
     screen: '5 "Nobody answered" (S-5)',
     now: REVEAL_STARTS_AT + 1_000,
     snapshot: resultsSnapshot(unranked('nobodyAnswered', 0)),
+  },
+  {
+    name: 'results-podium-done',
+    screen: '5 Podium, reveal done: places for those with votes, then the "No votes" group (G-50)',
+    now: PODIUM_RANKED.revealEndsAt + 1_000,
+    snapshot: podiumResults(PODIUM_RANKED),
+  },
+  {
+    name: 'results-podium-few-answers',
+    screen: '5 Podium, 3 answers: a three-way tie at the top, no full list (S-8 privacy)',
+    now: PODIUM_WITHHELD.revealEndsAt + 1_000,
+    snapshot: podiumResults(PODIUM_WITHHELD),
+  },
+  {
+    name: 'results-podium-three-players',
+    screen: '5 Podium down to 3 players: everyone placed, same steps as Spotlight (G-24)',
+    now: REVEAL_STARTS_AT + REVEAL_STEP_MS / 2,
+    snapshot: podiumResults(THREE_CANDIDATES, sixPlayers().slice(0, 3)),
   },
   {
     name: 'results-last-question',

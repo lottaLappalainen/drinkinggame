@@ -1,7 +1,7 @@
 import * as v from 'valibot';
 import { describe, expect, it } from 'vitest';
 import { AVATAR_PRESETS, AVATAR_PRESET_IDS, AVATAR_TONE_COUNT } from '../../src/shared/avatars';
-import { MAX_CANDIDATES } from '../../src/shared/constants';
+import { MAX_PLAYERS } from '../../src/shared/constants';
 import {
   ClientMessageSchema,
   CreateGameRequestSchema,
@@ -40,15 +40,21 @@ describe('client messages are strictly validated', () => {
     }
   });
 
-  it('setSettings carries the whole settings: a known length and at least one known category', () => {
-    const ok = { type: 'setSettings', settings: { gameLength: 25, categories: ['mild', 'spicy'] } };
-    expect(v.safeParse(ClientMessageSchema, ok).success).toBe(true);
+  it('setSettings carries the whole settings: length, add-on categories (maybe none) and mode', () => {
     for (const settings of [
-      { gameLength: 20, categories: ['mild'] }, // only 15/25/35 (G-20)
-      { gameLength: 25, categories: [] }, // at least one category (G-22)
-      { gameLength: 25, categories: ['mild', 'mild'] }, // no duplicates
-      { gameLength: 25, categories: ['wild'] }, // unknown category
-      { gameLength: 25 }, // categories missing
+      { gameLength: 25, categories: ['spicy', 'luuppi'], mode: 'spotlight' },
+      { gameLength: 15, categories: [], mode: 'podium' }, // no add-ons: Default only (G-22)
+    ])
+      expect(v.safeParse(ClientMessageSchema, { type: 'setSettings', settings }).success).toBe(
+        true,
+      );
+    for (const settings of [
+      { gameLength: 20, categories: [], mode: 'spotlight' }, // only 15/25/35 (G-20)
+      { gameLength: 25, categories: ['default'], mode: 'spotlight' }, // Default is not a setting
+      { gameLength: 25, categories: ['spicy', 'spicy'], mode: 'spotlight' }, // no duplicates
+      { gameLength: 25, categories: ['mild'], mode: 'spotlight' }, // retired category id
+      { gameLength: 25, categories: [], mode: 'top5' }, // unknown mode (G-24)
+      { gameLength: 25, categories: [] }, // mode missing
     ]) {
       expect(
         v.safeParse(ClientMessageSchema, { type: 'setSettings', settings }).success,
@@ -65,7 +71,8 @@ describe('client messages are strictly validated', () => {
       { type: 'hello', token: TOKEN, join: { nickname: 'A', presetId: 'not-a-preset' } },
       { type: 'setGameLength', length: 20 }, // renamed to setSettings
       { type: 'submit', roundId: 0, ranking: ['Mikko0000001'] }, // roundId starts at 1
-      { type: 'submit', roundId: 1, ranking: Array(MAX_CANDIDATES + 1).fill('Mikko0000001') },
+      { type: 'submit', roundId: 1, ranking: Array(MAX_PLAYERS + 1).fill('Mikko0000001') },
+      { type: 'submit', roundId: 1, ranking: [] }, // at least one spot
       { type: 'submit', roundId: 1, ranking: ['not an id'] },
       { type: 'updateProfile', photoVersion: 3 }, // a phone can never claim a photo
     ];
@@ -100,6 +107,10 @@ describe('game keys (G-11)', () => {
 
 const FORBIDDEN_KEYS = [
   'answers',
+  // Places only — never vote counts or averages (S-6, decided 2026-11-24).
+  'stats',
+  'averageSpot',
+  'firstVotes',
   'token',
   'tokenHash',
   'requesterTokenHash',
@@ -136,7 +147,7 @@ describe('outgoing messages can never carry secrets (S-6, CLAUDE.md §5)', () =>
     const keys = collectKeys(ServerMessageSchema);
     expect(keys).toContain('snapshot');
     expect(keys).toContain('ranking');
-    expect(keys).toContain('averageSpot');
+    expect(keys).toContain('noVotes');
   });
 
   it('no server→client schema contains answers, tokens, token hashes or points', () => {
@@ -167,8 +178,7 @@ describe('variants make impossible states unrepresentable (Phase 2 review)', () 
     key: 'ABCDE',
     gameId: 'Game00000001',
     hostId: 'Mikko0000001',
-    settings: { gameLength: 25, categories: ['mild', 'spicy'] },
-    questionCounts: { mild: 20, spicy: 10, personal: 10 },
+    settings: { gameLength: 25, categories: ['spicy'], mode: 'spotlight' },
     players: [],
     you: { playerId: 'Mikko0000001' },
     reclaims: [],

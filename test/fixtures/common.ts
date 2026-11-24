@@ -88,6 +88,21 @@ export function sixPlayers(): PublicPlayer[] {
   ];
 }
 
+/**
+ * A big game (Podium, G-24): the six players above plus generated guests, `count` in total
+ * (7 … MAX_PLAYERS). Guest ids are "Guest0000007", "Guest0000008", …
+ */
+export function manyPlayers(count: number): PublicPlayer[] {
+  const guests = Array.from({ length: Math.max(0, count - 6) }, (_, i) =>
+    player(guestId(i + 7), `Guest ${String(i + 7)}`, { avatar: preset('owl') }),
+  );
+  return [...sixPlayers(), ...guests];
+}
+
+export function guestId(n: number): PlayerId {
+  return playerId(`Guest${String(n).padStart(7, '0')}`);
+}
+
 /** Results are sent this long before the reveal starts (shared constant). */
 export const RESULTS_SENT_AT = T0 + 60_000;
 export const REVEAL_STARTS_AT = RESULTS_SENT_AT + REVEAL_BUFFER_MS;

@@ -4,9 +4,9 @@
 
 // ── Versions ────────────────────────────────────────────────────────────────
 /** Bump on any change to the saved GameState shape (CLAUDE.md §4 "State version + schema"). */
-export const STATE_VERSION = 1;
+export const STATE_VERSION = 2;
 /** Bump on any incompatible wire-protocol change (CLAUDE.md §4 "Deploys and protocol changes"). */
-export const PROTOCOL_VERSION = 1;
+export const PROTOCOL_VERSION = 2;
 
 // ── Players ─────────────────────────────────────────────────────────────────
 export const MAX_PLAYERS = 25; // active players per game (G-13)
@@ -26,10 +26,16 @@ export const GAME_KEY_LENGTH = 5; // G-11
 // 6 to 7 players therefore drops a question from 6 to 5 candidates — intended.
 export const SHOW_ALL_UP_TO = 6;
 export const CANDIDATES_WHEN_MORE = 5;
-/** The most candidates a question can ever have — what schemas and layouts must handle. */
+/** The most candidates a Spotlight question can have. Podium shows everyone (up to MAX_PLAYERS). */
 export const MAX_CANDIDATES = Math.max(SHOW_ALL_UP_TO, CANDIDATES_WHEN_MORE);
+// Podium mode (G-24): everyone is shown, each voter fills only the top PODIUM_SPOTS. The host can
+// pick it only with at least PODIUM_MIN_PLAYERS active players — its own constant on purpose, so
+// tuning SHOW_ALL_UP_TO after the phone test doesn't silently move it.
+export const PODIUM_SPOTS = 3;
+export const PODIUM_MIN_PLAYERS = 7;
 export const QUESTION_MAX_LENGTH = 120; // characters, so it fits a phone screen (Q-4, unsure)
-export const MIN_QUESTION_BANK_SIZE = 35; // = the longest game (G-32)
+/** Questions the always-on Default category must have: the longest game (G-23, G-32). */
+export const MIN_QUESTION_BANK_SIZE = 35;
 
 // ── Round timeline (all milliseconds) ───────────────────────────────────────
 export const QUESTION_INTRO_MS = 4_000; // question-only screen before answering (G-49, unsure)
@@ -46,7 +52,12 @@ export const ADVANCE_EARLY_MS = 500;
 
 // ── Scoring & privacy ───────────────────────────────────────────────────────
 export const MIN_ANSWERS_FOR_RANKING = 2; // fewer → "Not enough answers" (S-7)
-export const MIN_ANSWERS_FOR_STATS = 5; // average spot / #1 votes only from here (S-6)
+/**
+ * With some players unplaced (Podium), fewer answers than this show only the revealed top places —
+ * no full ranking, no "No votes" group: with few voters, who got points gives away who picked whom
+ * (S-8, unsure). Results never carry vote counts at all (S-6).
+ */
+export const MIN_ANSWERS_FOR_NO_VOTES_LIST = 5;
 
 // ── Presence, host and cleanup ──────────────────────────────────────────────
 export const HOST_HANDOVER_MS = 60_000; // host offline this long → role passes on (§10)

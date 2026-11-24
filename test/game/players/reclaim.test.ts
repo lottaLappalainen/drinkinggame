@@ -1,6 +1,6 @@
 // 3A: "That's me" (G-44) — request, host answer, delivery across reconnects, expiry, closing.
 import { describe, expect, it } from 'vitest';
-import { RECLAIM_TTL_MS } from '../../../src/shared/constants';
+import { PROTOCOL_VERSION, RECLAIM_TTL_MS } from '../../../src/shared/constants';
 import type { RequestId } from '../../../src/shared/protocol';
 import { C, P } from '../../fixtures/common';
 import { fakeTokenHash, lobbyState } from '../../fixtures/states';
@@ -100,7 +100,7 @@ describe('the host answers', () => {
     const { game, requestId } = sannaRequested();
     const effects = game.send(C.mikko, answer(requestId, false));
     expect(sentTo(effects, REQ)).toEqual([{ type: 'reclaimResult', approved: false }]);
-    expect(game.state.connections[REQ]).toEqual({ protocolVersion: 1 });
+    expect(game.state.connections[REQ]).toEqual({ protocolVersion: PROTOCOL_VERSION });
   });
 
   it('auto-denied the moment the real player comes back — no host answer needed (G-44)', () => {
@@ -109,7 +109,7 @@ describe('the host answers', () => {
     expect(sentTo(effects, REQ)).toEqual([{ type: 'reclaimResult', approved: false }]);
     expect(toHostMessages(effects)).toEqual([{ type: 'reclaimClosed', requestId }]);
     expect(game.state.reclaims).toEqual({});
-    expect(game.state.connections[REQ]).toEqual({ protocolVersion: 1 }); // anonymous again
+    expect(game.state.connections[REQ]).toEqual({ protocolVersion: PROTOCOL_VERSION }); // anonymous again
     // The host's late tap changes nothing.
     expect(game.send(C.mikko, answer(requestId, true))).toEqual([]);
     expect(game.state.players[P.sanna]?.tokenHash).toBe(fakeTokenHash(4));
@@ -126,7 +126,7 @@ describe('the host answers', () => {
           ...(c.playerId !== undefined && { playerId: c.playerId }),
           ...(c.reclaimRequestId !== undefined && { reclaimRequestId: c.reclaimRequestId }),
         })),
-        { connId: conn('sanna-socket'), protocolVersion: 1, playerId: P.sanna },
+        { connId: conn('sanna-socket'), protocolVersion: PROTOCOL_VERSION, playerId: P.sanna },
       ],
     });
     expect(sentTo(effects, REQ)).toEqual([{ type: 'reclaimResult', approved: false }]);
@@ -176,7 +176,7 @@ describe('collecting on the socket that is still waiting', () => {
     if (request) request.status = 'denied';
     const effects = game.send(REQ, { type: 'hello', tokenHash: fakeTokenHash(REQUESTER_TOKEN) });
     expect(sentTo(effects, REQ)).toEqual([{ type: 'reclaimResult', approved: false }]);
-    expect(game.state.connections[REQ]).toEqual({ protocolVersion: 1 });
+    expect(game.state.connections[REQ]).toEqual({ protocolVersion: PROTOCOL_VERSION });
   });
 });
 

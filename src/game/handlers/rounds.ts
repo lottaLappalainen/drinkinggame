@@ -6,7 +6,7 @@
 //
 // Conventions: MUTATE `draft`, return effects. The engine has already checked sender identity,
 // host-only, phase and stale roundId (a late or double Submit / Next never gets here).
-import { MIN_PLAYERS } from '../../shared/constants';
+import { MIN_PLAYERS, PODIUM_MIN_PLAYERS } from '../../shared/constants';
 import type { PlayerId } from '../../shared/protocol';
 import { serverAcceptsAdvance } from '../../shared/reveal';
 import { acceptsAnswers } from '../../shared/timeline';
@@ -18,9 +18,11 @@ import type { GameState, RoundState } from '../stateSchema';
 import type { Ctx, Effect, EngineMessageOf, Sender } from '../types';
 
 /**
- * Host starts the game from the LOBBY. Needs ≥ MIN_PLAYERS active players (G-21) and categories
- * that can fill the game length (G-23 → NOT_ENOUGH_QUESTIONS, the game stays in the lobby). Draws
- * the questions (G-22, G-31), then starts round 1.
+ * Host starts the game from the LOBBY. Needs ≥ MIN_PLAYERS active players (G-21) — and
+ * ≥ PODIUM_MIN_PLAYERS for Podium (G-24: the mode is never switched back by the server; the host
+ * sees why Start is disabled) — and a pool that fills the game length (G-23 safety net →
+ * NOT_ENOUGH_QUESTIONS). The game stays in the lobby on any refusal. Draws the questions (G-22,
+ * G-31), then starts round 1.
  */
 export function handleStart(
   draft: GameState,
@@ -28,7 +30,9 @@ export function handleStart(
   sender: Sender,
   ctx: Ctx,
 ): Effect[] {
-  if (activePlayers(draft).length < MIN_PLAYERS)
+  const active = activePlayers(draft).length;
+  if (active < MIN_PLAYERS) return [errorTo(sender.connId, 'NOT_ALLOWED', 'start')];
+  if (draft.settings.mode === 'podium' && active < PODIUM_MIN_PLAYERS)
     return [errorTo(sender.connId, 'NOT_ALLOWED', 'start')];
   const questions = drawQuestions(draft.settings.categories, draft.settings.gameLength, ctx.random);
   if (questions === null) return [errorTo(sender.connId, 'NOT_ENOUGH_QUESTIONS', 'start')];
@@ -39,7 +43,7 @@ export function handleStart(
 /**
  * A ranking (G-36, G-37). Silently ignored (a double tap, a slow phone) when this player already
  * answered or the answer window is over; refused before the window opens, from someone who isn't
- * taking part (a late joiner, G-19), and when it isn't a ranking of exactly the shown players.
+ * taking part (a late joiner, G-19), and when it doesn't fill exactly the round's spots.
  */
 export function handleSubmit(
   draft: GameState,
@@ -57,7 +61,7 @@ export function handleSubmit(
     return ctx.now < round.answerStartsAt ? refuse('NOT_ALLOWED') : [];
   }
   if (round.answers[playerId] !== undefined) return []; // final: a second tap changes nothing
-  if (!isRankingOf(msg.ranking, round.candidates)) return refuse('INVALID');
+  if (!fillsSpots(msg.ranking, round)) return refuse('INVALID');
 
   round.answers[playerId] = [...msg.ranking];
   return [
@@ -141,11 +145,14 @@ function senderId(sender: Sender): PlayerId {
   return sender.playerId;
 }
 
-/** Exactly the shown players, each once (G-36). */
-function isRankingOf(ranking: readonly PlayerId[], candidates: readonly PlayerId[]): boolean {
+/**
+ * The top `round.spots` places, each a different shown player (G-36, G-24) — one rule for both
+ * modes: in Spotlight spots = every shown player, in Podium the top 3.
+ */
+function fillsSpots(ranking: readonly PlayerId[], round: RoundState): boolean {
   return (
-    ranking.length === candidates.length &&
+    ranking.length === round.spots &&
     new Set(ranking).size === ranking.length &&
-    ranking.every((id) => candidates.includes(id))
+    ranking.every((id) => round.candidates.includes(id))
   );
 }
