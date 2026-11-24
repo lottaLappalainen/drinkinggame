@@ -55,7 +55,7 @@ export const ROUND_MS = ROUND_SECONDS * 1_000;
 export const ANSWER_GRACE_MS = 500;
 /** Results are sent slightly before the reveal starts, so every phone has them in time. */
 export const REVEAL_BUFFER_MS = 300;
-export const REVEAL_STEP_MS = 3_500; // one reveal step: names, then the drinking rule (G-50, D-6, unsure)
+export const REVEAL_STEP_MS = 3_000; // one reveal step: names, then the drinking rule (G-50, D-6; 3.5 s felt slow, user 2026-11-24)
 /** Within a reveal step, the drinking rule appears this long after the names (D-6). */
 export const REVEAL_RULE_DELAY_MS = 700;
 export const REVEAL_DRUMROLL_MS = 1_500; // extra pause before "most likely" (G-50)
