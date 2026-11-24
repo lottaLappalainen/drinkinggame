@@ -20,12 +20,21 @@ import {
   PONG_MESSAGE,
   WS_CLOSE,
 } from '../shared/constants';
-import type { ConnId, ErrorCode, GameId, GameKey, ServerMessage } from '../shared/protocol';
+import { photoUploadVerdict, type PhotoUploadVerdict } from '../game/players/photos';
+import type {
+  ConnId,
+  ErrorCode,
+  GameId,
+  GameKey,
+  PlayerId,
+  ServerMessage,
+} from '../shared/protocol';
 import { bindAttachment, newAttachment, readAttachment } from './core/attachment';
 import { hashToken, parseIncoming } from './core/incoming';
 import { isStale, nextLivenessCheckAt } from './core/liveness';
 import { STATE_KEY, loadState, saveState } from './core/persistence';
 import { newConnId, random } from './core/random';
+import { getPhoto, putPhoto, type PhotoContentType, type StoredPhoto } from './photos/photoStore';
 
 export type ClaimInput = {
   readonly key: GameKey;
@@ -38,6 +47,25 @@ export type ClaimInput = {
 export type ClaimOutcome =
   | { readonly ok: true; readonly gameId: GameId }
   | { readonly ok: false; readonly error: 'TAKEN' | ErrorCode };
+
+export type StorePhotoInput = {
+  readonly playerId: PlayerId;
+  /** The uploading phone's raw token (Authorization header) — hashed here, never stored. */
+  readonly token: string;
+  /** Detected from the bytes by the Worker, never taken from a header. */
+  readonly contentType: PhotoContentType;
+  readonly bytes: Uint8Array;
+};
+
+export type StorePhotoOutcome =
+  | { readonly result: 'ok'; readonly photoVersion: number }
+  | { readonly result: 'noGame' | Exclude<PhotoUploadVerdict, 'ok'> };
+
+export type GetPhotoInput = {
+  readonly gameId: GameId;
+  readonly playerId: PlayerId;
+  readonly version: number;
+};
 
 export class GameObject extends DurableObject<Env> {
   /**
@@ -82,6 +110,40 @@ export class GameObject extends DurableObject<Env> {
     saveState(this.ctx.storage.kv, result.state);
     this.syncAlarm();
     return { ok: true, gameId: result.state.gameId };
+  }
+
+  /**
+   * Store a profile photo (RPC from the photo route; 4B). The game decides who may and when
+   * (photoUploadVerdict: own player only, lobby — or a first photo — G-5, G-6); the bytes go in their
+   * own storage entry, then the `photoStored` event bumps the version and tells everyone through
+   * the normal event path.
+   */
+  storePhoto(input: StorePhotoInput): StorePhotoOutcome {
+    this.ensureLoaded();
+    if (this.game === null) return { result: 'noGame' };
+    const verdict = photoUploadVerdict(this.game, input.playerId, hashToken(input.token));
+    if (verdict !== 'ok') return { result: verdict };
+    putPhoto(this.ctx.storage.kv, input.playerId, {
+      contentType: input.contentType,
+      bytes: input.bytes,
+    });
+    this.handle({ kind: 'photoStored', playerId: input.playerId });
+    // handle() replaced this.game with the new state (or left it as it was).
+    const version = this.game.players[input.playerId]?.avatar.photoVersion ?? null;
+    return version === null ? { result: 'notActive' } : { result: 'ok', photoVersion: version };
+  }
+
+  /**
+   * A stored photo — only for THIS game (a reused key never serves an earlier game's photo) and only
+   * at the player's current version, because the URL is cached forever: version N must always be
+   * the same image.
+   */
+  getPhoto(input: GetPhotoInput): StoredPhoto | null {
+    this.ensureLoaded();
+    const game = this.game;
+    if (game === null || game.gameId !== input.gameId) return null;
+    if (game.players[input.playerId]?.avatar.photoVersion !== input.version) return null;
+    return getPhoto(this.ctx.storage.kv, input.playerId) ?? null;
   }
 
   /** WebSocket upgrade for `/ws/<KEY>?v=N` (the Worker checked the key's format). */

@@ -11,17 +11,25 @@ import {
 import {
   CreateGameRequestSchema,
   type CreateGameResponse,
-  type ErrorCode,
+  GameIdSchema,
+  GameKeySchema,
+  PlayerIdSchema,
   type GameKey,
-  type HttpErrorResponse,
+  type PlayerId,
 } from '../shared/protocol';
 import { GameObject } from './GameObject';
 import { readLimited } from './core/body';
+import { httpError } from './core/http';
 import { newGameKey } from './core/random';
+import { servePhoto, uploadPhoto } from './photos/photoRoutes';
 
 export { GameObject };
 
-const WS_PATH = new RegExp(`^/ws/([${GAME_KEY_ALPHABET}]{${String(GAME_KEY_LENGTH)}})$`);
+const KEY = `[${GAME_KEY_ALPHABET}]{${String(GAME_KEY_LENGTH)}}`;
+const ID = '[0-9A-Za-z]{12}';
+const WS_PATH = new RegExp(`^/ws/(${KEY})$`);
+const PHOTO_UPLOAD = new RegExp(`^/api/games/(${KEY})/photos/(${ID})$`);
+const PHOTO_DOWNLOAD = new RegExp(`^/api/games/(${KEY})/(${ID})/photos/(${ID})$`);
 
 export default {
   async fetch(request, env): Promise<Response> {
@@ -30,6 +38,23 @@ export default {
     if (url.pathname === '/api/games') {
       if (request.method !== 'POST') return httpError(405, 'NOT_ALLOWED');
       return createGame(request, env);
+    }
+
+    const upload = PHOTO_UPLOAD.exec(url.pathname);
+    if (upload) {
+      if (request.method !== 'PUT') return httpError(405, 'NOT_ALLOWED');
+      return uploadPhoto(request, env, gameKey(upload[1]), playerIdOf(upload[2]));
+    }
+    const download = PHOTO_DOWNLOAD.exec(url.pathname);
+    if (download) {
+      if (request.method !== 'GET') return httpError(405, 'NOT_ALLOWED');
+      return servePhoto(
+        env,
+        gameKey(download[1]),
+        v.parse(GameIdSchema, download[2]),
+        playerIdOf(download[3]),
+        url.searchParams.get('v'),
+      );
     }
 
     const key = WS_PATH.exec(url.pathname)?.[1];
@@ -80,7 +105,11 @@ export async function createGame(
   return httpError(503, 'CREATE_FAILED');
 }
 
-function httpError(status: number, error: ErrorCode): Response {
-  const body: HttpErrorResponse = { error };
-  return Response.json(body, { status });
+// The regexes above already guarantee the formats; parsing gives the values their brand.
+function gameKey(value: string | undefined): GameKey {
+  return v.parse(GameKeySchema, value);
+}
+
+function playerIdOf(value: string | undefined): PlayerId {
+  return v.parse(PlayerIdSchema, value);
 }

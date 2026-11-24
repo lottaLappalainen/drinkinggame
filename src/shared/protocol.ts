@@ -465,6 +465,14 @@ export const CreateGameResponseSchema = v.strictObject({
   gameId: GameIdSchema,
 });
 
+/**
+ * PUT /api/games/<KEY>/photos/<playerId> (body = the image bytes, header `Authorization: Bearer
+ * <token>`) → the new version; phones load it from GET …/<gameId>/photos/<playerId>?v=<version>.
+ */
+export const UploadPhotoResponseSchema = v.strictObject({
+  photoVersion: v.pipe(v.number(), v.integer(), v.minValue(1)),
+});
+
 export const HttpErrorResponseSchema = v.strictObject({ error: ErrorCodeSchema });
 
 // ── Derived types ───────────────────────────────────────────────────────────
@@ -504,6 +512,7 @@ export type ServerMessageType = ServerMessage['type'];
 export type CreateGameRequest = v.InferOutput<typeof CreateGameRequestSchema>;
 export type CreateGameResponse = v.InferOutput<typeof CreateGameResponseSchema>;
 export type HttpErrorResponse = v.InferOutput<typeof HttpErrorResponseSchema>;
+export type UploadPhotoResponse = v.InferOutput<typeof UploadPhotoResponseSchema>;
 
 /** Narrow a union message type by its `type`. */
 export type MessageOf<M extends { type: string }, T extends M['type']> = Extract<M, { type: T }>;
