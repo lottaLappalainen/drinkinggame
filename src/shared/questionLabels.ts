@@ -51,6 +51,16 @@ export function placeLabel(set: LabelSetId, place: number, lastPlace: number | n
   return ordinal(place);
 }
 
+/**
+ * The line above a full ranking (G-50): which way the list runs, in the question's own words —
+ * "From most likely to least likely", "From most to least". A partial ranking (`isPartialRanking`,
+ * Podium with unplaced players) has no "least", so it reads "Most likely first".
+ */
+export function rankingOrderLabel(set: LabelSetId, partial: boolean): string {
+  const { top, bottom } = LABEL_SETS[set];
+  return partial ? `${top} first` : `From ${top.toLowerCase()} to ${bottom.toLowerCase()}`;
+}
+
 /** 4 → "4th", 11 → "11th", 22 → "22nd". */
 export function ordinal(n: number): string {
   const lastTwo = n % 100;

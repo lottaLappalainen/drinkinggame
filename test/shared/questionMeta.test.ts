@@ -16,6 +16,7 @@ import {
   labelMismatch,
   ordinal,
   placeLabel,
+  rankingOrderLabel,
 } from '../../src/shared/questionLabels';
 
 describe('categories (Q-7, G-22)', () => {
@@ -70,6 +71,14 @@ describe('label sets (Q-8)', () => {
     expect(placeLabel('likely', 3, 3)).toBe('Least likely'); // 3 players
     expect(placeLabel('most', 2, 2)).toBe('Least'); // two places in total: 1 and 2
     expect(placeLabel('likely', 1, 1)).toBe('Most likely'); // everyone tied: top wins
+  });
+
+  it("the full ranking says which way it runs, in the question's words (G-50)", () => {
+    expect(rankingOrderLabel('likely', false)).toBe('From most likely to least likely');
+    expect(rankingOrderLabel('most', false)).toBe('From most to least');
+    // Podium with unplaced players: there is no "least".
+    expect(rankingOrderLabel('likely', true)).toBe('Most likely first');
+    expect(rankingOrderLabel('most', true)).toBe('Most first');
   });
 
   it('ordinals', () => {

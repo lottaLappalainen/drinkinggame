@@ -9,22 +9,19 @@
 
 /* ── Spots ── */
 
+/* Pinned to the top while the list scrolls under them, so a spot is always in reach of a drag:
+   Podium's long list, and Spotlight's 6 spots + list on a small phone (they don't fit one screen). */
 .spots {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-pinned);
+  background: var(--color-background);
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   margin: 0;
-  padding: 0;
+  padding: var(--space-2) 0;
   list-style: none;
-}
-
-/* Podium: the long list scrolls under the three spots, so they stay reachable for a drag. */
-.spotsPinned {
-  position: sticky;
-  top: 0;
-  z-index: var(--z-pinned);
-  padding-block: var(--space-2);
-  background: var(--color-background);
 }
 
 .spot {

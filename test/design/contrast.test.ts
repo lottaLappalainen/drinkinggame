@@ -61,6 +61,9 @@ const TEXT: readonly [string, string][] = [
   ['--rule-drink-fg', '--rule-drink-bg'],
   ['--rule-give-fg', '--rule-give-bg'],
   ['--subject-fg', '--subject-bg'],
+  ['--color-on-medal', '--color-medal-gold'], // place numbers 1 / 2 / 3 (full ranking)
+  ['--color-on-medal', '--color-medal-silver'],
+  ['--color-on-medal', '--color-medal-bronze'],
   ['--color-on-accent', '--color-accent'],
   ['--color-on-danger', '--color-danger'],
   ['--color-danger-text', '--color-surface'], // field errors

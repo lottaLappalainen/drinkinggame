@@ -69,7 +69,6 @@ export function RankingBoard(props: {
   const byId = new Map(props.candidates.map((p) => [p.playerId, p]));
   const placed = new Set(placement.filter((id): id is PlayerId => id !== null));
   const unplaced = props.candidates.filter((p) => !placed.has(p.playerId));
-  const partial = props.spots < props.candidates.length;
   const dragStart = dragStartFor(props.candidates.length);
   const dragFromSpot = drag !== null && placed.has(drag.playerId);
 
@@ -253,11 +252,7 @@ export function RankingBoard(props: {
         event.preventDefault(); // Android's long-press menu would end a hold-to-drag
       }}
     >
-      <ol
-        ref={spotsFlip}
-        class={cx(styles.spots, partial && styles.spotsPinned)}
-        aria-label={STRINGS.ranking.spots}
-      >
+      <ol ref={spotsFlip} class={styles.spots} aria-label={STRINGS.ranking.spots}>
         {placement.map((id, spot) => {
           const player = id !== null ? byId.get(id) : undefined;
           const caption = props.captionFor(spot);

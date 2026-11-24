@@ -49,6 +49,14 @@
   /* The player's name inside a "[player]" question (G-51) */
   --subject-bg: var(--color-accent);
   --subject-fg: var(--color-on-accent);
+
+  /* Place medals in the full ranking (G-50): 1 gold, 2 silver, 3 bronze. The number on them is the
+     literal dark text in BOTH themes (like on-accent); the edge keeps gold crisp on white (1.9:1). */
+  --color-medal-gold: var(--color-accent);
+  --color-medal-silver: #c4ccd4;
+  --color-medal-bronze: #d9925a;
+  --color-on-medal: #321b27;
+  --color-medal-edge: rgb(50 27 39 / 30%);
   --color-focus-ring: #612593;
   --color-slot-border: #7a6470; /* empty ranking spots, toggle tracks */
 
@@ -113,6 +121,9 @@
   --content-max: 32rem;
   --screen-min-height: 100dvh; /* the visible viewport, also with the mobile URL bar shown */
   --qr-size: 13rem;
+  --place-size: 2.25rem; /* the place-number column in the full ranking; a medal is this wide */
+  --place-font-size: var(--font-size-xl);
+  --screen-reader-only-size: 1px; /* text read aloud but never shown */
   --pick-tile-width: 5rem; /* one player in the ranking board's list (4 per row on a small phone) */
   --countdown-height: 0.5rem;
   --toggle-width: 3rem;
