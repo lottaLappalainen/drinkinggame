@@ -193,7 +193,7 @@ export default tseslint.config(
 
   // Unit tests and e2e run in Node.
   {
-    files: ['test/**/*.{ts,tsx}', 'e2e/**/*.ts'],
+    files: ['test/**/*.{ts,tsx}', 'e2e/**/*.ts', 'e2e-csp/**/*.ts'],
     languageOptions: { globals: globals.node },
   },
 

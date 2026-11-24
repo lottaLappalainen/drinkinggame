@@ -351,7 +351,7 @@ export function createStore(deps: StoreDeps) {
     handlers: { onOpen, onMessage, onClose },
 
     /** Host a game: the token is saved in the pending-create slot BEFORE the request. */
-    async hostGame(profile: Profile): Promise<boolean> {
+    hostGame: async (profile: Profile): Promise<boolean> => {
       const token = deps.newToken();
       storage.savePendingCreate(token);
       batch(() => {
@@ -373,14 +373,14 @@ export function createStore(deps: StoreDeps) {
     },
 
     /** An explicit Join tap (Home, a join link). Reuses this phone's login for the key if any. */
-    joinGame(key: GameKey, profile: Profile): void {
+    joinGame: (key: GameKey, profile: Profile): void => {
       const login = storage.loadGame(key) ?? { token: deps.newToken() };
       storage.saveGame(key, login); // saved before it is sent
       startConnection(key, login, profile);
     },
 
     /** "Join again" after LEFT / REMOVED: a NEW token, so it is a new player. */
-    joinAgain(key: GameKey, profile: Profile): void {
+    joinAgain: (key: GameKey, profile: Profile): void => {
       storage.forgetGame(key);
       const login = { token: deps.newToken() };
       storage.saveGame(key, login);
@@ -390,7 +390,7 @@ export function createStore(deps: StoreDeps) {
     resume,
 
     /** Another name after NAME_TAKEN / INVALID_NICKNAME — same token (it was never used). */
-    retryJoin(profile: Profile): void {
+    retryJoin: (profile: Profile): void => {
       const key = requireKey();
       if (key === null || entry === null) return;
       joinError.value = null;
@@ -400,7 +400,7 @@ export function createStore(deps: StoreDeps) {
     },
 
     /** "That's me" (G-44): a new token, saved first, sent from this anonymous socket. */
-    reclaimPlayer(playerId: PlayerId, profile: Profile): void {
+    reclaimPlayer: (playerId: PlayerId, profile: Profile): void => {
       const key = requireKey();
       if (key === null) return;
       entry = { token: deps.newToken() };
@@ -413,20 +413,20 @@ export function createStore(deps: StoreDeps) {
       // A fresh socket is anonymous for sure (onOpen sends the reclaim instead of a hello).
       conn.connect(key);
     },
-    cancelReclaim(): void {
+    cancelReclaim: (): void => {
       send({ type: 'cancelReclaim' });
       reclaim.value = null;
     },
 
     /** "Use here" after "Opened somewhere else": take the game back to this page. */
-    useHere(): void {
+    useHere: (): void => {
       const key = requireKey();
       if (key === null) return;
       if (!resume(key)) home();
     },
 
     /** Leave for good (G-41): the token is kept until `leftGame` (or LEFT) confirms it. */
-    leave(): void {
+    leave: (): void => {
       leaving = true;
       send({ type: 'leave' }, 'leave');
     },
@@ -438,42 +438,42 @@ export function createStore(deps: StoreDeps) {
      * A lazy chunk failed to load (`vite:preloadError`): a deploy removed the old hashed files.
      * Reload — sharing the once-per-minute cap with OUTDATED_CLIENT — or ask for a manual refresh.
      */
-    lazyChunkFailed(): void {
+    lazyChunkFailed: (): void => {
       if (!reloadOnce(storage, deps.now(), deps.reload)) endWith('refresh', false);
     },
 
-    dismissNotice(): void {
+    dismissNotice: (): void => {
       notice.value = null;
     },
 
     // Plain requests
-    updateProfile(patch: { nickname?: string; presetId?: PresetId }): boolean {
+    updateProfile: (patch: { nickname?: string; presetId?: PresetId }): boolean => {
       return send({ type: 'updateProfile', ...patch });
     },
-    setSettings(settings: Settings): boolean {
+    setSettings: (settings: Settings): boolean => {
       return send({ type: 'setSettings', settings }, 'setSettings');
     },
-    start(): boolean {
+    start: (): boolean => {
       return send({ type: 'start' }, 'start');
     },
-    submit(ranking: readonly PlayerId[]): boolean {
+    submit: (ranking: readonly PlayerId[]): boolean => {
       const s = snapshot.value;
       if (s?.phase !== 'QUESTION') return false;
       return send({ type: 'submit', roundId: s.round.roundId, ranking: [...ranking] }, 'submit');
     },
     /** Next / Finish (G-45). */
-    advance(): boolean {
+    advance: (): boolean => {
       const s = snapshot.value;
       if (s?.phase !== 'RESULTS') return false;
       return send({ type: 'advance', roundId: s.round.roundId }, 'advance');
     },
-    endGame(): boolean {
+    endGame: (): boolean => {
       return send({ type: 'end' }, 'end');
     },
-    removePlayer(playerId: PlayerId): boolean {
+    removePlayer: (playerId: PlayerId): boolean => {
       return send({ type: 'removePlayer', playerId });
     },
-    answerReclaim(requestId: RequestId, approve: boolean): boolean {
+    answerReclaim: (requestId: RequestId, approve: boolean): boolean => {
       return send({ type: 'answerReclaim', requestId, approve });
     },
   };

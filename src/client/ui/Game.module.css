@@ -1,0 +1,272 @@
+/* Game pieces: avatars, player chips and lists, countdown, ready list, reveal steps, QR code. */
+
+.avatar {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--radius-round);
+  line-height: 1;
+  user-select: none;
+}
+
+.avatarSm {
+  width: var(--avatar-sm);
+  height: var(--avatar-sm);
+  font-size: var(--font-size-md);
+}
+
+.avatarMd {
+  width: var(--avatar-md);
+  height: var(--avatar-md);
+  font-size: var(--font-size-xl);
+}
+
+.avatarLg {
+  width: var(--avatar-lg);
+  height: var(--avatar-lg);
+  font-size: var(--font-size-2xl);
+}
+
+.avatarXl {
+  width: var(--avatar-xl);
+  height: var(--avatar-xl);
+  font-size: var(--font-size-3xl);
+}
+
+.avatarPhoto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatarFaded {
+  opacity: var(--opacity-faded);
+}
+
+.tone1 {
+  background: var(--avatar-tone-1);
+}
+
+.tone2 {
+  background: var(--avatar-tone-2);
+}
+
+.tone3 {
+  background: var(--avatar-tone-3);
+}
+
+.tone4 {
+  background: var(--avatar-tone-4);
+}
+
+.tone5 {
+  background: var(--avatar-tone-5);
+}
+
+.tone6 {
+  background: var(--avatar-tone-6);
+}
+
+.tone7 {
+  background: var(--avatar-tone-7);
+}
+
+.tone8 {
+  background: var(--avatar-tone-8);
+}
+
+.chip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  min-width: 0;
+}
+
+.chipName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: var(--font-weight-bold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chipMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.listItem {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.countdown {
+  position: relative;
+  height: var(--countdown-height);
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+}
+
+.countdownBar {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--color-indicator);
+  transform-origin: left center;
+  animation:
+    drain var(--countdown-duration) linear var(--countdown-delay) both,
+    pulse var(--dur-pulse) var(--ease-out) var(--countdown-pulse-delay) infinite;
+}
+
+.countdownFrozen {
+  animation-play-state: paused;
+}
+
+@keyframes drain {
+  from {
+    transform: scaleX(1);
+  }
+
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: var(--opacity-faded);
+  }
+}
+
+.reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4);
+  border-radius: var(--card-radius);
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  text-align: center;
+  animation: enter-gentle var(--dur-reveal) var(--ease-out) both;
+}
+
+.revealTop {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  outline: var(--focus-ring-width) solid var(--color-indicator-strong);
+  animation: enter-big var(--dur-reveal) var(--ease-spring) both;
+}
+
+.revealLabel {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-heavy);
+  line-height: var(--line-height-tight);
+}
+
+.revealPeople {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-4);
+}
+
+.revealPerson {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: var(--avatar-xl);
+  font-weight: var(--font-weight-bold);
+  overflow-wrap: anywhere;
+}
+
+@keyframes enter-gentle {
+  from {
+    opacity: 0;
+    transform: translateY(var(--lift-distance));
+  }
+}
+
+@keyframes enter-big {
+  0% {
+    opacity: 0;
+    transform: scale(var(--pop-scale));
+  }
+
+  70% {
+    opacity: 1;
+  }
+}
+
+.drumroll {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-3xl);
+  animation: pulse var(--dur-pulse) var(--ease-out) infinite;
+}
+
+.qr {
+  width: var(--qr-size);
+  height: var(--qr-size);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-qr-background);
+}
+
+.qrModules {
+  fill: var(--color-qr-modules);
+}
+
+.qrPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--avatar-md), 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.avatarOption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min);
+  min-height: var(--tap-min);
+  padding: var(--space-1);
+  border: var(--border-width-strong) solid transparent;
+  border-radius: var(--radius-round);
+  background: transparent;
+  cursor: pointer;
+}
+
+.avatarOptionSelected {
+  border-color: var(--color-indicator);
+}

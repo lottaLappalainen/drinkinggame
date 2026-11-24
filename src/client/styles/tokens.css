@@ -1,0 +1,179 @@
+/*
+ * Design tokens — the ONLY file with raw values (CLAUDE.md §7 "UI architecture"). Components use
+ * the SEMANTIC tokens (what a value is for); primitives are the palette and scales they're built
+ * from. Restyling something everywhere = one line here. Every text/background pairing and every
+ * indicator is contrast-checked in both themes by test/client/contrast.test.ts.
+ */
+
+:root {
+  /* ── Palette (decided by the user, 2026-11-22) ── */
+  --color-primary: #981b5d; /* berry */
+  --color-secondary: #612593; /* purple */
+  --color-accent: #e2b436; /* gold */
+  --color-background: #dfe8d4; /* light sage */
+  --color-text: #321b27; /* very dark plum */
+  --color-surface: #fff;
+
+  /* text-on-X: components never pick text colors themselves */
+  --color-on-primary: #fff;
+  --color-on-secondary: #fff;
+  --color-on-accent: #321b27; /* literal dark — stays dark in dark mode too */
+  --color-on-surface: var(--color-text);
+  --color-on-background: var(--color-text);
+
+  /* ── More semantic colors ── */
+  --color-heading: var(--color-primary);
+  --color-text-muted: #5c4752;
+  --color-link: var(--color-primary);
+  --color-link-alt: var(--color-secondary);
+  --color-border: #d9d0d4;
+  --color-surface-muted: #f4f0f2; /* list rows, inputs */
+  --color-danger: #b3261e;
+  --color-on-danger: #fff;
+  --color-danger-text: #b3261e; /* errors as text (the fill above is for buttons) */
+  --color-success: #2e6b32;
+  --color-scrim: rgb(28 17 23 / 60%);
+  --color-qr-background: #fff; /* not themed: scanners need dark-on-white */
+  --color-qr-modules: #321b27;
+
+  /* Non-text indicators need ≥ 3:1 against what's next to them (WCAG 1.4.11) */
+  --color-indicator: #981b5d; /* timer bar, selected spot */
+  --color-indicator-strong: #612593; /* "most likely" ring */
+  --color-focus-ring: #612593;
+  --color-slot-border: #7a6470; /* empty ranking spots, toggle tracks */
+
+  /* Preset avatar backgrounds (shared/avatars.ts `tone`): soft, so every emoji reads on them */
+  --avatar-tone-1: #f6c1d9;
+  --avatar-tone-2: #d8c4f2;
+  --avatar-tone-3: #f7e2a4;
+  --avatar-tone-4: #c7e6c1;
+  --avatar-tone-5: #bfe0f2;
+  --avatar-tone-6: #f5cbb0;
+  --avatar-tone-7: #e3d5c8;
+  --avatar-tone-8: #cde8e3;
+
+  /* ── Spacing ── */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 4rem;
+
+  /* ── Radii ── */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.875rem;
+  --radius-lg: 1.25rem;
+  --radius-pill: 999px;
+  --radius-round: 50%;
+
+  /* ── Type ── (the phone's own font: nothing to download) */
+  --font-family:
+    system-ui, -apple-system, 'Segoe UI', roboto, 'Helvetica Neue', arial, sans-serif,
+    'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
+  --font-size-xs: 0.8125rem;
+  --font-size-sm: 0.9375rem;
+  --font-size-md: 1.0625rem;
+  --font-size-lg: 1.25rem;
+  --font-size-xl: 1.5rem;
+  --font-size-2xl: 2rem;
+  --font-size-3xl: 2.75rem;
+  --font-size-key: 3.25rem; /* the game key, read aloud across the room */
+  --font-weight-regular: 400;
+  --font-weight-bold: 650;
+  --font-weight-heavy: 800;
+  --line-height-tight: 1.15;
+  --line-height-body: 1.45;
+  --letter-spacing-key: 0.18em;
+
+  /* ── Sizes ── */
+  --tap-min: 2.75rem; /* 44 px minimum tap target */
+  --border-width: 1px;
+  --border-width-strong: 2px;
+  --focus-ring-width: 3px;
+  --avatar-sm: 2rem;
+  --avatar-md: 3rem;
+  --avatar-lg: 4.5rem;
+  --avatar-xl: 6.5rem;
+  --opacity-disabled: 0.55;
+  --opacity-faded: 0.45;
+  --content-max: 32rem;
+  --screen-min-height: 100dvh; /* the visible viewport, also with the mobile URL bar shown */
+  --qr-size: 13rem;
+  --countdown-height: 0.5rem;
+  --toggle-width: 3rem;
+  --toggle-height: 1.75rem;
+  --spinner-size: 1.5rem;
+  --edge-gutter: 1.25rem; /* keep drag areas off the iOS swipe-back edge */
+
+  /* ── Elevation ── */
+  --shadow-1: 0 1px 2px rgb(50 27 39 / 12%), 0 1px 3px rgb(50 27 39 / 8%);
+  --shadow-2: 0 6px 20px rgb(50 27 39 / 18%);
+  --z-overlay: 100;
+  --z-toast: 200;
+
+  /* ── Motion ── (one place to make the whole app snappier or calmer) */
+  --dur-fast: 150ms;
+  --dur-base: 250ms;
+  --dur-slow: 400ms;
+  --dur-reveal: 700ms;
+  --dur-pulse: 1s;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --pop-scale: 0.6;
+  --press-scale: 0.96;
+  --lift-distance: 0.75rem;
+
+  /* ── Component tokens (semantic) ── */
+  --button-radius: var(--radius-pill);
+  --button-height: var(--tap-min);
+  --button-height-lg: 3.5rem;
+  --button-padding-x: var(--space-5);
+  --button-font-size: var(--font-size-md);
+  --card-padding: var(--space-4);
+  --card-radius: var(--radius-lg);
+  --card-shadow: var(--shadow-1);
+  --input-radius: var(--radius-md);
+  --heading-1-size: var(--font-size-2xl);
+  --heading-2-size: var(--font-size-xl);
+  --heading-3-size: var(--font-size-lg);
+  --heading-weight: var(--font-weight-heavy);
+  --focus-ring: 0 0 0 var(--focus-ring-width) var(--color-focus-ring);
+}
+
+/* Dark theme (G-7): same brand colors, dark neutrals. Overrides tokens only. */
+[data-theme='dark'] {
+  --color-background: #1c1117;
+  --color-surface: #2b1d25;
+  --color-text: #eef2e8;
+  --color-text-muted: #b8aeb4;
+  --color-link: #e37bb0; /* raw berry as text on dark is only 2.3:1 */
+  --color-link-alt: #b993e0;
+  --color-heading: #e37bb0;
+  --color-border: #4a3641;
+  --color-surface-muted: #352530;
+  --color-success: #8fcf93;
+  --color-danger-text: #ff8a80;
+  --color-indicator: #e2b436;
+  --color-indicator-strong: #e37bb0;
+  --color-focus-ring: #e2b436;
+  --color-slot-border: #9c8f96;
+  --color-scrim: rgb(0 0 0 / 65%);
+  --shadow-1: 0 1px 3px rgb(0 0 0 / 40%);
+  --shadow-2: 0 6px 20px rgb(0 0 0 / 50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+    --dur-reveal: 1ms;
+    --pop-scale: 1;
+    --press-scale: 1;
+    --lift-distance: 0;
+  }
+}

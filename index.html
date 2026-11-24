@@ -3,7 +3,27 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#dfe8d4" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>drinkinggame</title>
+    <!-- Theme before first paint (no flash of the wrong theme, G-7). Its sha256 is in the CSP in
+         public/_headers — test/client/theme.test.ts fails if the two drift apart. -->
+    <script>
+      (function () {
+        var t = 'system';
+        try {
+          var s = localStorage.getItem('dg.theme');
+          if (s) t = JSON.parse(s);
+        } catch (e) {}
+        var d =
+          t === 'dark' ||
+          (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = d ? 'dark' : 'light';
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', d ? '#1c1117' : '#dfe8d4');
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

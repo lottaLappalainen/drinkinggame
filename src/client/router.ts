@@ -1,0 +1,43 @@
+// Routes (G-17): `/` (Profile / Home) and `/g/<KEY>` (everything inside a game), plus the dev
+// galleries `/dev/ui` and `/dev/screens` (dev + staging builds only). The game SCREEN comes from
+// the store, never from the URL — so refresh and Back always land correctly.
+import { signal } from '@preact/signals';
+import type { GameKey } from '../shared/protocol';
+import { isGameKey } from './storage';
+
+export type Route =
+  | { readonly name: 'home' }
+  | { readonly name: 'game'; readonly key: GameKey }
+  | { readonly name: 'devUi' }
+  | { readonly name: 'devScreens' };
+
+export function parseRoute(pathname: string): Route {
+  const game = /^\/g\/([^/]+)\/?$/.exec(pathname);
+  const key = game?.[1]?.toUpperCase();
+  if (key !== undefined && isGameKey(key)) return { name: 'game', key };
+  if (pathname === '/dev/ui') return { name: 'devUi' };
+  if (pathname === '/dev/screens') return { name: 'devScreens' };
+  return { name: 'home' };
+}
+
+export function gamePath(key: GameKey): string {
+  return `/g/${key}`;
+}
+
+export const route = signal<Route>({ name: 'home' });
+
+/** Called once from main.tsx. */
+export function initRouter(): void {
+  route.value = parseRoute(location.pathname);
+  window.addEventListener('popstate', () => {
+    route.value = parseRoute(location.pathname);
+  });
+}
+
+export function navigate(path: string, options: { replace?: boolean } = {}): void {
+  if (location.pathname !== path) {
+    if (options.replace === true) history.replaceState(null, '', path);
+    else history.pushState(null, '', path);
+  }
+  route.value = parseRoute(path);
+}

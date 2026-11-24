@@ -23,11 +23,13 @@
     "test": "node scripts/vitest.mjs run",
     "test:watch": "node scripts/vitest.mjs",
     "test:e2e": "playwright test",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "test:csp": "playwright test --config playwright.csp.config.ts"
   },
   "dependencies": {
     "@preact/signals": "2.11.4",
     "preact": "10.29.8",
+    "uqr": "0.1.3",
     "valibot": "1.5.0"
   },
   "devDependencies": {

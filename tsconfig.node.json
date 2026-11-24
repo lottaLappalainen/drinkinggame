@@ -6,6 +6,6 @@
     "lib": ["ES2024", "DOM"],
     "types": ["node"]
   },
-  "include": ["*.config.ts", "test/**/*", "e2e/**/*", "scripts/**/*"],
+  "include": ["*.config.ts", "test/**/*", "e2e/**/*", "e2e-csp/**/*", "scripts/**/*"],
   "exclude": ["test/server/**/*", "test/client/**/*"]
 }

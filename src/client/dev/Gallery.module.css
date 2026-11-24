@@ -1,0 +1,97 @@
+/* Dev galleries (dev + staging builds only) — the living style guide and every screen fixture. */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-5);
+  background: var(--color-background);
+  color: var(--color-on-background);
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(var(--content-max), 1fr));
+  gap: var(--space-5);
+}
+
+.themeColumn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  border-radius: var(--card-radius);
+  background: var(--color-background);
+  color: var(--color-on-background);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.frames {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-5);
+}
+
+.frameWrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: var(--content-max);
+}
+
+.frame {
+  height: calc(var(--content-max) * 1.6);
+  overflow: auto;
+  border: var(--border-width-strong) solid var(--color-border);
+  border-radius: var(--card-radius);
+  background: var(--color-background);
+  transform: translateZ(0); /* fixed-position children stay inside the frame */
+}
+
+.swatches {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--avatar-xl), 1fr));
+  gap: var(--space-2);
+}
+
+.swatch {
+  height: var(--avatar-md);
+  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.swatchPrimary {
+  background: var(--color-primary);
+}
+
+.swatchSecondary {
+  background: var(--color-secondary);
+}
+
+.swatchAccent {
+  background: var(--color-accent);
+}
+
+.swatchSurface {
+  background: var(--color-surface);
+}
+
+.swatchIndicator {
+  background: var(--color-indicator);
+}
+
+.swatchFocus {
+  background: var(--color-focus-ring);
+}

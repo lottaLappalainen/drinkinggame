@@ -1,0 +1,74 @@
+/* Typography: every heading and text style in the app. Recolor all headings = --color-heading. */
+
+.heading {
+  color: var(--color-heading);
+  font-weight: var(--heading-weight);
+  line-height: var(--line-height-tight);
+  overflow-wrap: anywhere;
+}
+
+.h1 {
+  font-size: var(--heading-1-size);
+}
+
+.h2 {
+  font-size: var(--heading-2-size);
+}
+
+.h3 {
+  font-size: var(--heading-3-size);
+}
+
+.text {
+  overflow-wrap: anywhere;
+}
+
+.body {
+  font-size: var(--font-size-md);
+}
+
+.muted {
+  font-size: var(--font-size-md);
+  color: var(--color-text-muted);
+}
+
+.small {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-key);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.question {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+}
+
+.questionLarge {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-heavy);
+  line-height: var(--line-height-tight);
+}
+
+.key {
+  font-size: var(--font-size-key);
+  font-weight: var(--font-weight-heavy);
+  letter-spacing: var(--letter-spacing-key);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-heading);
+}
+
+.center {
+  text-align: center;
+}
+
+.strong {
+  font-weight: var(--font-weight-bold);
+}

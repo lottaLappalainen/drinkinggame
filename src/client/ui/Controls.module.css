@@ -1,0 +1,220 @@
+/* Controls: buttons, inputs, segmented control, toggle. ≥ 44 px tap targets (--tap-min). */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: var(--button-height);
+  min-width: var(--tap-min);
+  padding: var(--space-2) var(--button-padding-x);
+  border: var(--border-width-strong) solid transparent;
+  border-radius: var(--button-radius);
+  font-size: var(--button-font-size);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-tight);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform var(--dur-fast) var(--ease-out),
+    opacity var(--dur-fast) var(--ease-out);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.button:active:not(:disabled) {
+  transform: scale(var(--press-scale));
+}
+
+.block {
+  width: 100%;
+}
+
+.large {
+  min-height: var(--button-height-lg);
+  font-size: var(--font-size-lg);
+}
+
+.primary {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.secondary {
+  background: var(--color-secondary);
+  color: var(--color-on-secondary);
+}
+
+.accent {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.danger {
+  background: var(--color-danger);
+  color: var(--color-on-danger);
+}
+
+.ghost {
+  background: transparent;
+  color: var(--color-link);
+  border-color: var(--color-slot-border);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-round);
+  background: transparent;
+  color: var(--color-link);
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+}
+
+.iconButton:active {
+  transform: scale(var(--press-scale));
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.fieldLabel {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.input {
+  min-height: var(--tap-min);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-strong) solid var(--color-slot-border);
+  border-radius: var(--input-radius);
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-size: var(--font-size-lg);
+}
+
+.inputKey {
+  font-weight: var(--font-weight-heavy);
+  letter-spacing: var(--letter-spacing-key);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+.inputInvalid {
+  border-color: var(--color-danger-text);
+}
+
+.fieldHint {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.fieldError {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-danger-text);
+}
+
+.segmented {
+  display: flex;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--button-radius);
+  background: var(--color-surface-muted);
+  border: var(--border-width) solid var(--color-border);
+}
+
+.segment {
+  flex: 1 1 0;
+  min-height: var(--tap-min);
+  padding: var(--space-1) var(--space-3);
+  border: var(--border-width-strong) solid transparent;
+  border-radius: var(--button-radius);
+  background: transparent;
+  color: var(--color-text);
+  font-weight: var(--font-weight-bold);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.segmentSelected {
+  background: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.segment:disabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap-min);
+  cursor: pointer;
+}
+
+.toggleRowDisabled {
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
+}
+
+.toggleText {
+  display: flex;
+  flex-direction: column;
+}
+
+.toggleInput {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.toggleTrack {
+  position: relative;
+  flex: none;
+  width: var(--toggle-width);
+  height: var(--toggle-height);
+  border: var(--border-width-strong) solid var(--color-slot-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-muted);
+  transition: background var(--dur-fast) var(--ease-out);
+}
+
+.toggleThumb {
+  position: absolute;
+  inset-block: var(--space-1);
+  left: var(--space-1);
+  aspect-ratio: 1;
+  border-radius: var(--radius-round);
+  background: var(--color-slot-border);
+  transition: transform var(--dur-base) var(--ease-spring);
+}
+
+.toggleInput:checked + .toggleTrack {
+  background: var(--color-primary);
+  border-color: var(--color-indicator);
+}
+
+.toggleInput:checked + .toggleTrack .toggleThumb {
+  background: var(--color-on-primary);
+  transform: translateX(calc(var(--toggle-width) - var(--toggle-height)));
+}
+
+.toggleInput:focus-visible + .toggleTrack {
+  box-shadow: var(--focus-ring);
+}

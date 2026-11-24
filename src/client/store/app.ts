@@ -29,12 +29,20 @@ export function createApp(deps: AppDeps): Store {
   return store;
 }
 
+let deps: AppDeps | null = null;
 let instance: Store | null = null;
 
 /** The app's store (created on first use, in the browser). */
 export function appStore(): Store {
-  instance ??= createApp(browserDeps());
+  deps ??= browserDeps();
+  instance ??= createApp(deps);
   return instance;
+}
+
+/** The same storage the store uses (profile, theme, saved games). */
+export function appStorage(): Storage {
+  deps ??= browserDeps();
+  return deps.storage;
 }
 
 function browserDeps(): AppDeps {
