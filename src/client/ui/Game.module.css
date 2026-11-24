@@ -137,17 +137,23 @@
     pulse var(--dur-pulse) var(--ease-out) var(--countdown-pulse-delay) infinite;
 }
 
+/* The intro bar fills up (no pulse). Before .countdownFrozen: this shorthand resets play-state. */
+.countdownIntro {
+  animation: fill var(--countdown-duration) linear var(--countdown-delay) both;
+}
+
 .countdownFrozen {
   animation-play-state: paused;
 }
 
-/* The seconds under the board: same digit widths, so the line doesn't wobble as it counts. */
-.secondsLeft {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-bold);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-  color: var(--color-text);
+@keyframes fill {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
 }
 
 @keyframes drain {

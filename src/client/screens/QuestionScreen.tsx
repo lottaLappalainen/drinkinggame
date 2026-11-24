@@ -2,6 +2,7 @@
 // time's up) comes from the round's timestamps and the synced clock (shared/timeline.ts), with ONE
 // timer to the next boundary — a phone that comes back mid-round lands on the right step.
 import { useState } from 'preact/hooks';
+import { QUESTION_INTRO_MS } from '../../shared/constants';
 import type { PlayerId, PublicPlayer, SnapshotOf } from '../../shared/protocol';
 import { placeLabel } from '../../shared/questionLabels';
 import { isWaitingForNextRound } from '../../shared/ready';
@@ -11,7 +12,7 @@ import { dragStartFor, isComplete, type Placement } from '../ranking/gesture';
 import { RankingBoard } from '../ranking/RankingBoard';
 import { STRINGS } from '../strings';
 import { Button } from '../ui/Controls';
-import { Countdown, QuestionText, ReadyList, readyCountOf, SecondsLeft } from '../ui/Game';
+import { Countdown, QuestionText, ReadyList, readyCountOf } from '../ui/Game';
 import { Center, Dock, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
@@ -40,6 +41,14 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
         <Center grow>
           <QuestionText text={round.question.text} subject={subject} source={source} large center />
         </Center>
+        {/* Fills up during the intro: full = answering opens (G-49). */}
+        <Countdown
+          startsAt={round.answerStartsAt - QUESTION_INTRO_MS}
+          endsAt={round.answerStartsAt}
+          now={now}
+          frozen={env.frozen}
+          intro
+        />
         <PausedBanner paused={snapshot.paused} />
         <ReclaimPrompts snapshot={snapshot} />
         <GameMenu snapshot={snapshot} />
@@ -59,8 +68,6 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
       {STRINGS.round.readyCount(counter.ready, counter.total)}
     </Text>
   );
-  // The time once more at the bottom, in numbers (the bar stays at the top).
-  const secondsLine = <SecondsLeft endsAt={round.endsAt} now={now} frozen={env.frozen} />;
 
   if (step === 'answering' && !watching)
     return (
@@ -72,7 +79,6 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
         </Stack>
         <Answer key={round.roundId} snapshot={snapshot} />
         {readyLine}
-        {secondsLine}
         <PausedBanner paused={snapshot.paused} />
         <ReclaimPrompts snapshot={snapshot} />
         <GameMenu snapshot={snapshot} />
@@ -104,7 +110,6 @@ export function QuestionScreen(props: { snapshot: SnapshotOf<'QUESTION'> }) {
       />
       <PausedBanner paused={snapshot.paused} />
       <ReclaimPrompts snapshot={snapshot} />
-      {step !== 'closed' && secondsLine}
       <Spacer />
       <GameMenu snapshot={snapshot} />
     </Screen>

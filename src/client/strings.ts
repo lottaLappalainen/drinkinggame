@@ -112,6 +112,8 @@ export const STRINGS = {
     notThisRound: "You'll join from the next question",
     timeUp: "Time's up",
     secondsLeft: (s: number) => `${String(s)} seconds left`,
+    /** Screen-reader label of the intro bar (never shown). */
+    startsSoon: 'Answering starts in a moment',
   },
   ranking: {
     /** How to place, by how a drag starts (ranking/gesture.ts DragStart). */

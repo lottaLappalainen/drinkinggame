@@ -167,12 +167,15 @@ const PULSE_FROM_END_MS = 5_000;
  * The answer timer: a CSS animation computed once from the timestamps (duration = whole answer
  * time, negative delay = time already gone) — no per-frame updates, and a phone that comes back
  * mid-round lands on the right width. Pulses in the last 5 s.
+ * `intro`: the quick bar of the question-only screen (G-49) — it FILLS up instead of draining, and
+ * doesn't pulse; full = answering opens.
  */
 export function Countdown(props: {
   startsAt: number;
   endsAt: number;
   now: number;
   frozen?: boolean;
+  intro?: boolean;
 }) {
   // Captured ONCE per round: a running CSS animation keeps its start time, so a delay recomputed on
   // every re-render (each playerReady) would push the bar forward by the time since it appeared.
@@ -186,9 +189,17 @@ export function Countdown(props: {
   const elapsed = timing.current.elapsed;
   const left = Math.max(0, Math.round((props.endsAt - props.now) / 1000));
   return (
-    <div class={styles.countdown} role="timer" aria-label={STRINGS.round.secondsLeft(left)}>
+    <div
+      class={styles.countdown}
+      role="timer"
+      aria-label={props.intro === true ? STRINGS.round.startsSoon : STRINGS.round.secondsLeft(left)}
+    >
       <div
-        class={cx(styles.countdownBar, props.frozen === true && styles.countdownFrozen)}
+        class={cx(
+          styles.countdownBar,
+          props.intro === true && styles.countdownIntro,
+          props.frozen === true && styles.countdownFrozen,
+        )}
         // eslint-disable-next-line no-restricted-syntax -- runtime timer values, as CSS variables only (CLAUDE.md §7 allows this)
         style={{
           '--countdown-duration': `${String(total)}ms`,
@@ -197,39 +208,6 @@ export function Countdown(props: {
         }}
       />
     </div>
-  );
-}
-
-/**
- * The answer time as words ("23 seconds left"), for the bottom of the question screen. Re-renders
- * once per whole second only (one timer to the next boundary, never per frame). `now` is the
- * server time at the parent's render; between parent renders it moves on with the phone's clock.
- */
-export function SecondsLeft(props: { endsAt: number; now: number; frozen?: boolean }) {
-  const clock = useRef({ base: props.now, at: Date.now() });
-  if (clock.current.base !== props.now) clock.current = { base: props.now, at: Date.now() };
-  const [, setTick] = useState(0);
-  const now =
-    props.frozen === true ? props.now : clock.current.base + (Date.now() - clock.current.at);
-  const remaining = Math.max(0, props.endsAt - now);
-  const left = Math.ceil(remaining / 1000);
-  useEffect(() => {
-    if (props.frozen === true || remaining <= 0) return;
-    // Just past the next whole-second boundary, so the number is never a second behind.
-    const id = window.setTimeout(
-      () => {
-        setTick((n) => n + 1);
-      },
-      (remaining % 1000 || 1000) + 15,
-    );
-    return () => {
-      window.clearTimeout(id);
-    };
-  });
-  return (
-    <p class={styles.secondsLeft} role="timer">
-      {STRINGS.round.secondsLeft(left)}
-    </p>
   );
 }
 
@@ -408,12 +386,21 @@ export function DrinkBadge(props: {
   );
 }
 
-/** Compact rule next to a place in the full ranking: "🍺 drinks 5". */
+/**
+ * Compact rule next to a place in the full ranking: "🍺 5" / "👉 7" (the colour and emoji tell drink
+ * from give out; the full words are read out). Narrow on purpose: names must keep their room.
+ */
 export function DrinkChip(props: { rule: DrinkRule }) {
   const { rule } = props;
+  const words = STRINGS.drinks.chip(rule.action, rule.sips);
   return (
-    <span class={cx(styles.ruleChip, rule.action === 'drink' ? styles.ruleDrink : styles.ruleGive)}>
-      {`${RULE_EMOJI[rule.action]} ${STRINGS.drinks.chip(rule.action, rule.sips)}`}
+    <span
+      class={cx(styles.ruleChip, rule.action === 'drink' ? styles.ruleDrink : styles.ruleGive)}
+      role="img"
+      aria-label={words}
+      title={words}
+    >
+      {`${RULE_EMOJI[rule.action]} ${String(rule.sips)}`}
     </span>
   );
 }

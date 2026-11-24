@@ -37,11 +37,11 @@ import {
   QuestionText,
   ReadyList,
   RevealStep,
-  SecondsLeft,
 } from '../ui/Game';
 import { DRINK_RULES } from '../../shared/drinkRules';
 import { Dock, Row, Stack } from '../ui/Layout';
 import { PhotoPicker } from '../ui/PhotoPicker';
+import { PlaceNumber } from '../ui/PlaceNumber';
 import { QrCode } from '../ui/QrCode';
 import { Heading, Text } from '../ui/Text';
 import styles from './Gallery.module.css';
@@ -239,10 +239,17 @@ function Components() {
           me={P.mikko}
         />
       </Section>
-      <Section title="Countdown (frozen at 60 % and in the last seconds)">
+      <Section title="Countdown (frozen at 60 %, in the last seconds, and the intro bar filling up)">
         <Countdown startsAt={T0} endsAt={T0 + 30_000} now={T0 + 18_000} frozen />
         <Countdown startsAt={T0} endsAt={T0 + 30_000} now={T0 + 27_000} frozen />
-        <SecondsLeft endsAt={T0 + 30_000} now={T0 + 18_000} frozen />
+        <Countdown startsAt={T0} endsAt={T0 + 4_000} now={T0 + 2_500} frozen intro />
+      </Section>
+      <Section title="Place numbers (full ranking: medals for 1 to 3, a tie shares one, plain below)">
+        <Row gap="3" wrap>
+          {[1, 1, 3, 4, 12].map((place, i) => (
+            <PlaceNumber key={i} place={place} />
+          ))}
+        </Row>
       </Section>
       <Section title="Reveal (with the drinking rule a beat after the names)">
         <RevealStep
