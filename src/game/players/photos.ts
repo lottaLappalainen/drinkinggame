@@ -1,7 +1,16 @@
 // Who may store a profile photo, and when (G-5, G-6) — checked by the server BEFORE it stores the
 // bytes; the `photoStored` event then bumps the version and tells everyone.
 import type { PlayerId } from '../../shared/protocol';
-import type { GameState } from '../stateSchema';
+import type { GameState, PlayerState } from '../stateSchema';
+
+/**
+ * The version the next stored photo gets — ONE definition for the server (which saves the bytes
+ * under it) and the `photoStored` event (which publishes it), so `?v=N` always names the bytes that
+ * were saved as version N.
+ */
+export function nextPhotoVersion(player: PlayerState): number {
+  return (player.avatar.photoVersion ?? 0) + 1;
+}
 
 export type PhotoUploadVerdict =
   | 'ok'

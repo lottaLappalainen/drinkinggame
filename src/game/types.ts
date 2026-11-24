@@ -13,7 +13,7 @@ import type {
 } from '../shared/protocol';
 import type { PresetId } from '../shared/avatars';
 import type { WS_CLOSE } from '../shared/constants';
-import type { GameState } from './stateSchema';
+import type { GameState, PlayerState } from './stateSchema';
 
 export type { GameState };
 
@@ -145,3 +145,17 @@ export type Sender = {
   readonly playerId?: PlayerId;
   readonly reclaimRequestId?: RequestId;
 };
+
+/**
+ * The sender of a message only an active player may send (MESSAGE_RULES sender 'player'), resolved
+ * ONCE by the engine: `player` is that player's record in the draft (active, on this very socket),
+ * so handlers neither look it up again nor re-check that it exists.
+ */
+export type PlayerSender = {
+  readonly connId: ConnId;
+  readonly playerId: PlayerId;
+  readonly player: PlayerState;
+};
+
+/** The sender of a message only a "That's me" requester may send (sender kind 'requester'). */
+export type RequesterSender = { readonly connId: ConnId; readonly requestId: RequestId };

@@ -67,7 +67,6 @@ export function player(
     status: 'active',
     online: true,
     offlineSince: null,
-    waitingForNextRound: false,
     ...overrides,
   };
 }

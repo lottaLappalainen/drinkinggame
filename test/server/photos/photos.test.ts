@@ -88,6 +88,20 @@ describe('uploading a photo', () => {
     expect(current.headers.get('Content-Type')).toBe('image/webp'); // stored type, from the bytes
   });
 
+  it('serves version N only if the saved bytes ARE version N — never a later picture under an old URL', async () => {
+    const game = await lobby();
+    await upload(game.key, game.ainoId, jpeg(), game.ainoToken);
+    // As if saving version 2's bytes succeeded but publishing the version failed.
+    await runInDurableObject(stub(game.key), (_o: GameObject, state) => {
+      state.storage.kv.put(`photo:${game.ainoId}`, {
+        version: 2,
+        contentType: 'image/webp',
+        bytes: webp(),
+      });
+    });
+    expect((await download(game.key, game.gameId, game.ainoId, 1)).status).toBe(404);
+  });
+
   it("needs the player's own token (G-6)", async () => {
     const game = await lobby();
     expect((await upload(game.key, game.ainoId, jpeg())).status).toBe(401); // no token

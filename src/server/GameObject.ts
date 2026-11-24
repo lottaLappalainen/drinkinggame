@@ -16,11 +16,17 @@ import type { Ctx, Effect, EngineEvent, RebuildSocket } from '../game/types';
 import type { PresetId } from '../shared/avatars';
 import {
   MAX_ANONYMOUS_CONNECTIONS,
+  OVERDUE_DEADLINE_RETRY_MS,
   PING_MESSAGE,
   PONG_MESSAGE,
   WS_CLOSE,
 } from '../shared/constants';
-import { photoUploadVerdict, type PhotoUploadVerdict } from '../game/players/photos';
+import { checkInvariants } from '../game/invariants';
+import {
+  nextPhotoVersion,
+  photoUploadVerdict,
+  type PhotoUploadVerdict,
+} from '../game/players/photos';
 import type {
   ConnId,
   ErrorCode,
@@ -59,7 +65,9 @@ export type StorePhotoInput = {
 
 export type StorePhotoOutcome =
   | { readonly result: 'ok'; readonly photoVersion: number }
-  | { readonly result: 'noGame' | Exclude<PhotoUploadVerdict, 'ok'> };
+  | { readonly result: 'noGame' | Exclude<PhotoUploadVerdict, 'ok'> }
+  /** The bytes were saved but the game didn't publish the version (an engine failure, logged). */
+  | { readonly result: 'failed' };
 
 export type GetPhotoInput = {
   readonly gameId: GameId;
@@ -122,15 +130,20 @@ export class GameObject extends DurableObject<Env> {
     this.ensureLoaded();
     if (this.game === null) return { result: 'noGame' };
     const verdict = photoUploadVerdict(this.game, input.playerId, hashToken(input.token));
-    if (verdict !== 'ok') return { result: verdict };
+    const player = this.game.players[input.playerId];
+    if (verdict !== 'ok' || player === undefined)
+      return { result: verdict === 'ok' ? 'unknownPlayer' : verdict };
+    // Saved under the version the event will publish (one definition: nextPhotoVersion).
+    const version = nextPhotoVersion(player);
     putPhoto(this.ctx.storage.kv, input.playerId, {
+      version,
       contentType: input.contentType,
       bytes: input.bytes,
     });
     this.handle({ kind: 'photoStored', playerId: input.playerId });
-    // handle() replaced this.game with the new state (or left it as it was).
-    const version = this.game.players[input.playerId]?.avatar.photoVersion ?? null;
-    return version === null ? { result: 'notActive' } : { result: 'ok', photoVersion: version };
+    return this.photoVersionOf(input.playerId) === version
+      ? { result: 'ok', photoVersion: version }
+      : { result: 'failed' };
   }
 
   /**
@@ -143,7 +156,9 @@ export class GameObject extends DurableObject<Env> {
     const game = this.game;
     if (game === null || game.gameId !== input.gameId) return null;
     if (game.players[input.playerId]?.avatar.photoVersion !== input.version) return null;
-    return getPhoto(this.ctx.storage.kv, input.playerId) ?? null;
+    const photo = getPhoto(this.ctx.storage.kv, input.playerId);
+    // The URL is cached forever: serve version N only if the saved bytes ARE version N.
+    return photo?.version === input.version ? photo : null;
   }
 
   /** WebSocket upgrade for `/ws/<KEY>?v=N` (the Worker checked the key's format). */
@@ -237,8 +252,31 @@ export class GameObject extends DurableObject<Env> {
     }
   }
 
-  /** applyEvent → save if changed → effects in order → alarm. */
+  /**
+   * Handle one event. Due game deadlines run FIRST, as their own event: the alarm only wakes the
+   * object, it doesn't define when a deadline takes effect. A late or retried alarm must not let a
+   * message act on a state whose deadline has passed (approving an expired "That's me", a host who
+   * should have been replaced, a round that should be over). After a `rebuild` instead of before:
+   * the online flags are only true once it ran (a handover must not pick a phone that is gone).
+   */
   private handle(event: EngineEvent): void {
+    if (event.kind === 'rebuild') {
+      this.apply(event);
+      this.runDueDeadlines();
+    } else {
+      if (event.kind !== 'deadline') this.runDueDeadlines();
+      this.apply(event);
+    }
+    this.syncAlarm();
+  }
+
+  private runDueDeadlines(): void {
+    const due = this.game === null ? null : nextDeadline(this.game);
+    if (due !== null && due <= this.clock()) this.apply({ kind: 'deadline' });
+  }
+
+  /** applyEvent → save if changed → effects in order. (handle() sets the alarm afterwards.) */
+  private apply(event: EngineEvent): void {
     const game = this.game;
     if (game === null) return;
     let result;
@@ -252,9 +290,13 @@ export class GameObject extends DurableObject<Env> {
     if (result.changed) {
       this.game = result.state;
       saveState(this.ctx.storage.kv, result.state);
+      // The tests check every rule after every event; here a broken one is only logged (there is
+      // no good recovery mid-party) so a bad game night can be diagnosed afterwards. Ids only.
+      const problems = checkInvariants(result.state);
+      if (problems.length > 0)
+        console.error(`[game] invariants broken after ${event.kind}: ${problems.join('; ')}`);
     }
     this.execute(result.effects, result.state);
-    this.syncAlarm();
   }
 
   /**
@@ -322,10 +364,19 @@ export class GameObject extends DurableObject<Env> {
     this.alarmAt = null;
   }
 
-  /** Alarm = min(next game deadline, next liveness check while any socket is open). */
+  /**
+   * Alarm = min(next game deadline, next liveness check while any socket is open). A deadline that
+   * is STILL due after an event means the engine failed on it (every event runs due deadlines
+   * first): retrying at the past deadline would fire at once, again and again, and could use up
+   * the free plan's daily requests — so it is retried OVERDUE_DEADLINE_RETRY_MS later instead.
+   */
   private syncAlarm(): void {
     const game = this.game;
-    const deadline = game === null ? null : nextDeadline(game);
+    let deadline = game === null ? null : nextDeadline(game);
+    if (deadline !== null && deadline <= this.clock()) {
+      console.error('[game] a deadline is still due after its event; retrying later');
+      deadline = Date.now() + OVERDUE_DEADLINE_RETRY_MS;
+    }
     const liveness =
       game !== null && this.ctx.getWebSockets().length > 0 ? nextLivenessCheckAt(Date.now()) : null;
     const candidates = [deadline, liveness].filter((t): t is number => t !== null);
@@ -382,6 +433,14 @@ export class GameObject extends DurableObject<Env> {
       });
     }
     return sockets;
+  }
+
+  /**
+   * The player's published photo version, read AFTER an event: handle() replaces this.game (or
+   * leaves it, if the engine failed; or clears it, if a due deadline deleted the game).
+   */
+  private photoVersionOf(playerId: PlayerId): number | null {
+    return this.game?.players[playerId]?.avatar.photoVersion ?? null;
   }
 
   private anonymousConnections(): number {

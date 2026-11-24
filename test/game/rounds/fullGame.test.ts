@@ -6,10 +6,11 @@
 // built against — so a drift between them shows up here, not in Phase 6.
 import * as v from 'valibot';
 import { describe, expect, it } from 'vitest';
-import { buildSnapshot } from '../../../src/game/handlers/players';
+import { buildSnapshot } from '../../../src/game/players/view';
 import { keysOf } from '../../../src/game/ids';
 import { checkSnapshotInvariants } from '../../../src/game/invariants';
 import { HOST_HANDOVER_MS, QUESTION_INTRO_MS } from '../../../src/shared/constants';
+import { isWaitingForNextRound } from '../../../src/shared/ready';
 import {
   SnapshotSchema,
   type ConnId,
@@ -163,9 +164,7 @@ describe('a whole game through the engine', () => {
     // Round 3: Emma joins in the middle — she watches, everyone else answers.
     game.hello(conn('emma'), 10, { nickname: 'Emma' });
     const emma = game.playerWithToken(10) ?? P.emma;
-    expect(buildSnapshot(game.state, emma).players.find((p) => p.playerId === emma)).toMatchObject({
-      waitingForNextRound: true,
-    });
+    expect(isWaitingForNextRound(emma, 'active', round(game))).toBe(true);
     game.wait(QUESTION_INTRO_MS);
     for (const c of [C.mikko, C.aino, C.ville, conn('sanna-2'), juho]) submit(game, c);
     expect(game.state.phase).toBe('RESULTS'); // Emma isn't waited for

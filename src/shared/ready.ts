@@ -6,7 +6,7 @@
 // ready = those of them who submitted
 // Offline players who haven't answered are listed separately and are NOT in total.
 
-import type { PlayerId } from './protocol';
+import type { PlayerId, PlayerStatus } from './protocol';
 
 export type ReadyCounter = { readonly ready: number; readonly total: number };
 
@@ -31,4 +31,17 @@ export function readyCounter(
  */
 export function canEndEarly(now: number, answerStartsAt: number, counter: ReadyCounter): boolean {
   return now >= answerStartsAt && counter.total >= 1 && counter.ready === counter.total;
+}
+
+/**
+ * A late joiner before their first question (G-15, G-19): active, but not taking part in the round
+ * on screen — "You'll join from the next question". Derived from the round the phone already has
+ * instead of sent per player: such a flag would go stale with every `roundStarted`.
+ */
+export function isWaitingForNextRound(
+  playerId: PlayerId,
+  status: PlayerStatus,
+  round: { readonly participants: readonly PlayerId[] } | null,
+): boolean {
+  return status === 'active' && round !== null && !round.participants.includes(playerId);
 }

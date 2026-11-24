@@ -5,6 +5,7 @@ import { MIN_QUESTION_BANK_SIZE, QUESTION_MAX_LENGTH } from '../shared/constants
 import { CategoryIdSchema, LabelSetIdSchema, type Question } from '../shared/protocol';
 import {
   ALWAYS_ON_CATEGORY,
+  CATEGORY_IDS,
   gameCategories,
   type AddOnCategoryId,
   type CategoryId,
@@ -99,7 +100,10 @@ export function questionPool(
 export function questionCounts(
   bank: readonly Question[] = QUESTION_BANK,
 ): Record<CategoryId, number> {
-  const counts: Record<CategoryId, number> = { default: 0, spicy: 0, luuppi: 0 };
+  const counts = Object.fromEntries(CATEGORY_IDS.map((id) => [id, 0])) as Record<
+    CategoryId,
+    number
+  >; // safe: one entry per CategoryId, built from the list that defines the type
   for (const question of bank) counts[question.category] += 1;
   return counts;
 }

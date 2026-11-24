@@ -160,6 +160,26 @@ describe('rebuild after a load (CLAUDE.md §3/§4)', () => {
     expect(game.state.deadlines.hostHandover).toBe(game.now + HOST_HANDOVER_MS);
   });
 
+  it('a host found online again by the rebuild keeps the role — the handover is cancelled', () => {
+    const game = session(lobbyState());
+    game.close(C.mikko);
+    expect(game.state.deadlines.hostHandover).toBeDefined();
+    // The restart kept a socket of his that the saved state had already marked offline.
+    game.event({
+      kind: 'rebuild',
+      sockets: [
+        ...all.filter((s) => s.playerId !== P.mikko),
+        {
+          connId: conn('mikko-again'),
+          protocolVersion: PROTOCOL_VERSION,
+          playerId: P.mikko,
+        },
+      ],
+    });
+    expect(game.state.players[P.mikko]?.connId).toBe(conn('mikko-again'));
+    expect(game.state.deadlines.hostHandover).toBeUndefined();
+  });
+
   it('a socket on an old protocol is told to reload and closed', () => {
     const game = session(lobbyState());
     const old = { connId: conn('old'), protocolVersion: PROTOCOL_VERSION + 1 };

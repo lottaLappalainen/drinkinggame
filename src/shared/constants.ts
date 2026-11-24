@@ -68,6 +68,12 @@ export const IDLE_LOBBY_MS = 30 * 60_000; // nobody connected, lobby → deleted
 export const IDLE_STARTED_MS = 3 * 60 * 60_000; // nobody connected, started game → deleted (§10)
 export const LIVENESS_CHECK_MS = 30_000; // server-only stale-socket sweep (CLAUDE.md §6)
 export const LIVENESS_TIMEOUT_MS = 45_000; // no ping for this long → socket closed
+/**
+ * Server: a game deadline still due AFTER an event means the engine failed on it. The alarm is then
+ * retried this much later instead of at the (past) deadline — which would fire at once, forever,
+ * and burn the free plan's daily request budget.
+ */
+export const OVERDUE_DEADLINE_RETRY_MS = 10_000;
 
 // ── Client connection ───────────────────────────────────────────────────────
 export const CLIENT_PING_MS = 20_000; // phone heartbeat; answered by the runtime's auto-response

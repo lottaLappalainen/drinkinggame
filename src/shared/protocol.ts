@@ -24,7 +24,9 @@ import {
 
 /** Random server-generated ids (players, game instances, reclaim requests): 12 base62 chars. */
 export const ID_LENGTH = 12;
-const ID_PATTERN = /^[0-9A-Za-z]{12}$/;
+/** The id format without anchors — also used to build the Worker's URL routes. */
+export const ID_SOURCE = `[0-9A-Za-z]{${String(ID_LENGTH)}}`;
+const ID_PATTERN = new RegExp(`^${ID_SOURCE}$`);
 
 export const PlayerIdSchema = v.pipe(v.string(), v.regex(ID_PATTERN), v.brand('PlayerId'));
 export const GameIdSchema = v.pipe(v.string(), v.regex(ID_PATTERN), v.brand('GameId'));
@@ -104,8 +106,8 @@ export const PublicPlayerSchema = v.strictObject({
   online: v.boolean(),
   /** For the host's remove button (G-43: offline ≥ 2 min) and "Offline" labels. */
   offlineSince: v.nullable(TimestampSchema),
-  /** Joined mid-game; takes part from the next question (G-15, G-19). */
-  waitingForNextRound: v.boolean(),
+  // No "waiting for the next round" flag: phones derive it from the round's participants
+  // (shared/ready.ts isWaitingForNextRound) — a per-player flag goes stale with every roundStarted.
 });
 
 /**
@@ -276,6 +278,9 @@ const OTHER_ERROR_CODES = [
   'GAME_FULL', // G-13
   'INVALID_NICKNAME', // G-1
   'NOT_ALLOWED', // wrong phase, not host, not identified, …
+  'NOT_ENOUGH_PLAYERS', // start / switching to Podium with too few active players (G-21, G-24)
+  'PAUSED', // advance while too few players are active (G-42)
+  'TOO_EARLY', // submit before answering opens, advance before the reveal ends: the phone's clock is off
   'INVALID', // message failed validation
   'RECLAIM_UNAVAILABLE', // target came back, left, or already has a pending request
   'LEFT', // this phone's player left the game (G-41)

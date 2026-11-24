@@ -17,15 +17,7 @@ export function toPublicPlayer(
     status: player.status,
     online: player.connId !== null,
     offlineSince: player.offlineSince,
-    waitingForNextRound: isWaitingForNextRound(state, player),
   };
-}
-
-/** A late joiner before their first round (G-15, G-19). Never true in the lobby. */
-export function isWaitingForNextRound(state: GameState, player: PlayerState): boolean {
-  if (state.phase === 'LOBBY' || state.phase === 'ENDED' || player.status !== 'active')
-    return false;
-  return player.activeFromRound > (state.round?.roundId ?? 0);
 }
 
 export function publicPlayers(state: GameState): PublicPlayer[] {

@@ -15,25 +15,25 @@ import { activePlayers } from '../players/presence';
 import { drawQuestions } from '../rounds/draw';
 import { closeRound, closeRoundIfEveryoneReady, endGame, startRound } from '../rounds/round';
 import type { GameState, RoundState } from '../stateSchema';
-import type { Ctx, Effect, EngineMessageOf, Sender } from '../types';
+import type { Ctx, Effect, EngineMessageOf, PlayerSender } from '../types';
 
 /**
  * Host starts the game from the LOBBY. Needs ≥ MIN_PLAYERS active players (G-21) — and
  * ≥ PODIUM_MIN_PLAYERS for Podium (G-24: the mode is never switched back by the server; the host
  * sees why Start is disabled) — and a pool that fills the game length (G-23 safety net →
- * NOT_ENOUGH_QUESTIONS). The game stays in the lobby on any refusal. Draws the questions (G-22,
+ * NOT_ENOUGH_QUESTIONS). The game stays in the lobby on any refusal; too few players is
+ * NOT_ENOUGH_PLAYERS, so the phone can say why (someone may have left just as the host tapped). Draws the questions (G-22,
  * G-31), then starts round 1.
  */
 export function handleStart(
   draft: GameState,
   _msg: EngineMessageOf<'start'>,
-  sender: Sender,
+  sender: PlayerSender,
   ctx: Ctx,
 ): Effect[] {
   const active = activePlayers(draft).length;
-  if (active < MIN_PLAYERS) return [errorTo(sender.connId, 'NOT_ALLOWED', 'start')];
-  if (draft.settings.mode === 'podium' && active < PODIUM_MIN_PLAYERS)
-    return [errorTo(sender.connId, 'NOT_ALLOWED', 'start')];
+  const needed = draft.settings.mode === 'podium' ? PODIUM_MIN_PLAYERS : MIN_PLAYERS;
+  if (active < needed) return [errorTo(sender.connId, 'NOT_ENOUGH_PLAYERS', 'start')];
   const questions = drawQuestions(draft.settings.categories, draft.settings.gameLength, ctx.random);
   if (questions === null) return [errorTo(sender.connId, 'NOT_ENOUGH_QUESTIONS', 'start')];
   draft.questions = questions;
@@ -42,23 +42,26 @@ export function handleStart(
 
 /**
  * A ranking (G-36, G-37). Silently ignored (a double tap, a slow phone) when this player already
- * answered or the answer window is over; refused before the window opens, from someone who isn't
+ * answered or the answer window is over; refused before the window opens (TOO_EARLY: the phone's
+ * clock runs ahead — it may simply send again), from someone who isn't
  * taking part (a late joiner, G-19), and when it doesn't fill exactly the round's spots.
  */
 export function handleSubmit(
   draft: GameState,
   msg: EngineMessageOf<'submit'>,
-  sender: Sender,
+  sender: PlayerSender,
   ctx: Ctx,
 ): Effect[] {
   const round = currentRound(draft);
-  const playerId = senderId(sender);
-  const refuse = (code: 'NOT_ALLOWED' | 'INVALID') => [errorTo(sender.connId, code, 'submit')];
+  const { playerId } = sender;
+  const refuse = (code: 'NOT_ALLOWED' | 'INVALID' | 'TOO_EARLY') => [
+    errorTo(sender.connId, code, 'submit'),
+  ];
 
   if (!round.participants.includes(playerId)) return refuse('NOT_ALLOWED');
   if (!acceptsAnswers(ctx.now, round)) {
-    // Too early is a bug on the phone; too late is just a slow phone (the alarm closes the round).
-    return ctx.now < round.answerStartsAt ? refuse('NOT_ALLOWED') : [];
+    // Too early: the phone's clock is ahead. Too late: just a slow phone (the round closes anyway).
+    return ctx.now < round.answerStartsAt ? refuse('TOO_EARLY') : [];
   }
   if (round.answers[playerId] !== undefined) return []; // final: a second tap changes nothing
   if (!fillsSpots(msg.ranking, round)) return refuse('INVALID');
@@ -71,22 +74,24 @@ export function handleSubmit(
 }
 
 /**
- * The host's Next / Finish (G-45), from the end of the reveal on (with a little clock tolerance;
- * earlier taps are ignored — the phone only unlocks the button when the reveal is done). After the
- * last question it ends the game — also while paused. Otherwise the next round starts, unless the
- * game is paused (G-42): the host's Next works again once enough players are back.
+ * The host's Next / Finish (G-45), from the end of the reveal on (with a little clock tolerance).
+ * Earlier → TOO_EARLY: the phone unlocks the button by its synced clock, so this only happens with
+ * a clock that is off — the phone re-enables the button instead of waiting for a round that never
+ * comes. After the last question it ends the game — also while paused. Otherwise the next round
+ * starts, unless the game is paused (G-42 → PAUSED): Next works again once enough players are back.
  */
 export function handleAdvance(
   draft: GameState,
   _msg: EngineMessageOf<'advance'>,
-  sender: Sender,
+  sender: PlayerSender,
   ctx: Ctx,
 ): Effect[] {
   const round = currentRound(draft);
   if (round.results === null) throw new Error('Engine contract broken: advance outside RESULTS');
-  if (!serverAcceptsAdvance(ctx.now, round.results.revealEndsAt)) return [];
+  if (!serverAcceptsAdvance(ctx.now, round.results.revealEndsAt))
+    return [errorTo(sender.connId, 'TOO_EARLY', 'advance')];
   if (round.index + 1 >= draft.questions.length) return endGame(draft, ctx, 'finished');
-  if (draft.paused) return [errorTo(sender.connId, 'NOT_ALLOWED', 'advance')];
+  if (draft.paused) return [errorTo(sender.connId, 'PAUSED', 'advance')];
   return startRound(draft, ctx, round.roundId + 1);
 }
 
@@ -94,7 +99,7 @@ export function handleAdvance(
 export function handleEnd(
   draft: GameState,
   _msg: EngineMessageOf<'end'>,
-  _sender: Sender,
+  _sender: PlayerSender,
   ctx: Ctx,
 ): Effect[] {
   return endGame(draft, ctx, 'hostEnded');
@@ -137,12 +142,6 @@ function currentRound(draft: GameState): RoundState {
   if (draft.round === null)
     throw new Error('Engine contract broken: round message without a round');
   return draft.round;
-}
-
-function senderId(sender: Sender): PlayerId {
-  if (sender.playerId === undefined)
-    throw new Error('Engine contract broken: player message without a player');
-  return sender.playerId;
 }
 
 /**

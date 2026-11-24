@@ -43,6 +43,9 @@ export async function uploadPhoto(
       return httpError(403, 'NOT_ALLOWED');
     case 'locked':
       return httpError(409, 'NOT_ALLOWED'); // changing a photo is lobby-only (G-5)
+    case 'failed':
+      // A server bug (logged): the phone keeps its preset avatar, as for any failed upload.
+      return httpError(500, 'INVALID');
   }
 }
 

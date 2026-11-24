@@ -2,7 +2,7 @@
 // own welcome — otherwise every apply() call would "prove" an ordering it never verifies.
 import { describe, expect, it } from 'vitest';
 import { broadcast, send, toHost } from '../../src/game/effects';
-import { buildSnapshot } from '../../src/game/handlers/players';
+import { buildSnapshot } from '../../src/game/players/view';
 import type { ConnId, PlayerId } from '../../src/shared/protocol';
 import { C, P, REQUEST_ID } from '../fixtures/common';
 import { lobbyState } from '../fixtures/states';

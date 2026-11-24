@@ -3,9 +3,14 @@
 import { evictDurableObject, runDurableObjectAlarm, runInDurableObject } from 'cloudflare:test';
 import { describe, expect, it } from 'vitest';
 import type { GameObject } from '../../../src/server/GameObject';
-import { MAX_ANONYMOUS_CONNECTIONS, PROTOCOL_VERSION } from '../../../src/shared/constants';
+import {
+  MAX_ANONYMOUS_CONNECTIONS,
+  OVERDUE_DEADLINE_RETRY_MS,
+  PROTOCOL_VERSION,
+} from '../../../src/shared/constants';
 import type { ConnId, PlayerId } from '../../../src/shared/protocol';
 import { Phone, createGame, setClock, settle, storedState, stub, tokenFor } from './phone';
+import type { GameState } from './types';
 
 /** A lobby: the host's phone plus joined players, everyone welcomed. */
 async function lobby(names: readonly string[] = ['Aino']) {
@@ -233,6 +238,59 @@ describe('hibernation and restarts (CLAUDE.md §3, §4)', () => {
       approved: true,
     });
     expect((await requester.next('welcome')).playerId).toBe(aino.id);
+  });
+});
+
+describe('deadlines take effect with every event, not only when the alarm fires', () => {
+  it('a host answering an expired "That\'s me" after its deadline, before the alarm: it is denied (G-44)', async () => {
+    const game = await lobby(['Aino']);
+    const aino = game.players[0];
+    if (!aino) throw new Error('setup');
+    aino.phone.close();
+    await game.host.next('playerConnection');
+    const requester = await Phone.hello(game.key, tokenFor('new-phone'), 'Aino');
+    await requester.next('error');
+    requester.send({
+      type: 'reclaim',
+      playerId: aino.id,
+      token: tokenFor('new-phone'),
+      nickname: 'Aino',
+      presetId: 'cat',
+    });
+    await requester.next('reclaimPending');
+    const { request } = await game.host.next('reclaimRequested');
+
+    // The request has expired, but the alarm hasn't run (late, or retried).
+    await setClock(game.key, request.expiresAt + 1_000);
+    game.host.send({ type: 'answerReclaim', requestId: request.requestId, approve: true });
+    expect(await requester.next('reclaimResult')).toEqual({
+      type: 'reclaimResult',
+      approved: false,
+    });
+    const back = await Phone.hello(game.key, aino.token); // Aino's own phone still owns her spot
+    expect((await back.next('welcome')).playerId).toBe(aino.id);
+  });
+
+  it('a deadline nothing clears is retried later, not at once forever (free-plan request budget)', async () => {
+    const game = await lobby([]);
+    // No open sockets, so no liveness check competes for the alarm (it would be at most 30 s away).
+    game.host.close();
+    await game.host.closed();
+    await settle();
+    // A state with a due deadline that no handler consumes (a round deadline in the lobby).
+    await runInDurableObject(stub(game.key), async (_o: GameObject, state) => {
+      const saved = state.storage.kv.get<GameState>('state');
+      if (saved === undefined) throw new Error('setup');
+      state.storage.kv.put('state', { ...saved, deadlines: { ...saved.deadlines, roundEnd: 1 } });
+      await state.storage.setAlarm(Date.now() + 60_000);
+    });
+    await evictDurableObject(stub(game.key));
+    const before = Date.now();
+    expect(await runDurableObjectAlarm(stub(game.key))).toBe(true);
+    const next = await runInDurableObject(stub(game.key), (_o: GameObject, state) =>
+      state.storage.getAlarm(),
+    );
+    expect(next).toBeGreaterThanOrEqual(before + OVERDUE_DEADLINE_RETRY_MS - 1_000);
   });
 });
 

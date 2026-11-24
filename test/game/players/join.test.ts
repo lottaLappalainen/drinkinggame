@@ -3,6 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyClaim } from '../../../src/game/engine';
 import { MAX_PLAYERS, PROTOCOL_VERSION, WS_CLOSE } from '../../../src/shared/constants';
+import { isWaitingForNextRound } from '../../../src/shared/ready';
 import { C, GAME_KEY, P, T0, gameId } from '../../fixtures/common';
 import {
   endedState,
@@ -157,10 +158,9 @@ describe('late joiners (G-15, G-19)', () => {
     const late = game.state.players[welcome.playerId];
     expect(late?.activeFromRound).toBe(2);
     expect(late?.timesShown).toBe(1);
-    expect(welcome.snapshot.phase).toBe('QUESTION');
-    expect(
-      welcome.snapshot.players.find((p) => p.playerId === welcome.playerId)?.waitingForNextRound,
-    ).toBe(true);
+    const { snapshot } = welcome;
+    if (snapshot.phase !== 'QUESTION') throw new Error('expected a QUESTION snapshot');
+    expect(isWaitingForNextRound(welcome.playerId, 'active', snapshot.round)).toBe(true);
   });
 });
 

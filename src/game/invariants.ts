@@ -10,6 +10,7 @@ import {
   MAX_PLAYERS,
   MIN_ANSWERS_FOR_NO_VOTES_LIST,
   MIN_ANSWERS_FOR_RANKING,
+  MIN_PLAYERS,
 } from '../shared/constants';
 import type { PlayerId, RoundResults, Snapshot } from '../shared/protocol';
 import { gameCategories, type CategoryId } from '../shared/questionCategories';
@@ -60,6 +61,11 @@ export function checkInvariants(state: GameState): string[] {
     }
     if (request.expiresAt <= request.createdAt)
       fail(`reclaim ${requestId}: expires before created`);
+    // One socket waits on a request, like one socket per player (G-18).
+    const waiting = Object.values(state.connections).filter(
+      (c) => c.reclaimRequestId === requestId,
+    ).length;
+    if (waiting > 1) fail(`reclaim ${requestId}: ${String(waiting)} sockets wait on it`);
   }
 
   // ── Host, limits, names ──────────────────────────────────────────────────
@@ -69,9 +75,21 @@ export function checkInvariants(state: GameState): string[] {
   if (active.length > MAX_PLAYERS) fail(`${active.length} active players > MAX_PLAYERS`);
   const nameKeys = active.map(([, p]) => p.nameKey);
   if (new Set(nameKeys).size !== nameKeys.length) fail('two active players share a nameKey (G-14)');
+  // A handover is pending only while there is a host who is offline, in a game still running.
+  if (state.deadlines.hostHandover !== undefined) {
+    const host = state.hostId === null ? undefined : players[state.hostId];
+    if (state.phase === 'ENDED' || host === undefined || host.connId !== null)
+      fail('deadlines.hostHandover is set without an offline host in a running game');
+  }
 
   // ── Phase ↔ round ↔ results ↔ deadlines ──────────────────────────────────
   const { phase, round } = state;
+  // G-42: paused exactly while a started game has too few active players (late joiners count).
+  const shouldPause = (phase === 'QUESTION' || phase === 'RESULTS') && active.length < MIN_PLAYERS;
+  if (state.paused !== shouldPause)
+    fail(
+      `paused is ${String(state.paused)} with ${String(active.length)} active players in ${phase}`,
+    );
   if ((phase === 'ENDED') !== (state.endReason !== null))
     fail(`endReason ${String(state.endReason)} does not fit phase ${phase}`);
   if (phase === 'LOBBY' && round !== null) fail('LOBBY with a round');

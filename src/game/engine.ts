@@ -12,7 +12,10 @@
 import type { ConnId, Phase } from '../shared/protocol';
 import { errorTo, send } from './effects';
 import * as players from './handlers/players';
+import * as reclaim from './handlers/reclaim';
 import * as rounds from './handlers/rounds';
+import * as session from './handlers/session';
+import * as sockets from './handlers/sockets';
 import type { GameState } from './stateSchema';
 import type {
   ClaimEvent,
@@ -22,6 +25,8 @@ import type {
   EngineClientMessage,
   EngineEvent,
   EngineResult,
+  PlayerSender,
+  RequesterSender,
   Sender,
 } from './types';
 
@@ -85,16 +90,16 @@ export function applyEvent(state: GameState, event: EngineEvent, ctx: Ctx): Engi
       effects = routeMessage(draft, event.from, event.msg, ctx);
       break;
     case 'connectionOpened':
-      effects = players.onConnectionOpened(draft, event, ctx);
+      effects = sockets.onConnectionOpened(draft, event, ctx);
       break;
     case 'connectionClosed':
-      effects = players.onConnectionClosed(draft, event, ctx);
+      effects = sockets.onConnectionClosed(draft, event, ctx);
       break;
     case 'rebuild':
       // Effects only for real changes (CLAUDE.md §3): a plain hibernation wake changes nothing and
       // sends nothing, but a socket that vanished during a restart is a real change — dropping its
       // consequences (round end, pause) would leave connected phones waiting forever.
-      effects = players.onRebuild(draft, event, ctx);
+      effects = sockets.onRebuild(draft, event, ctx);
       break;
     case 'photoStored':
       effects = players.onPhotoStored(draft, event, ctx);
@@ -118,7 +123,7 @@ export function applyEvent(state: GameState, event: EngineEvent, ctx: Ctx): Engi
 
 /** Create a game: the one event applied to no state (the DO is empty until claimed). */
 export function applyClaim(event: ClaimEvent, ctx: Ctx): ClaimResult {
-  return players.claimGame(event, ctx);
+  return session.claimGame(event, ctx);
 }
 
 // ── Routing ─────────────────────────────────────────────────────────────────
@@ -160,34 +165,54 @@ function routeMessage(
   }
   if (!rule.phases.includes(draft.phase)) return notAllowed;
 
+  // The rule above guarantees the sender kind; these resolve it into the type the handler takes.
+  const player = () => asPlayer(draft, sender);
+  const requester = () => asRequester(sender);
   switch (msg.type) {
     case 'hello':
-      return players.handleHello(draft, msg, sender, ctx);
+      return session.handleHello(draft, msg, sender, ctx);
     case 'updateProfile':
-      return players.handleUpdateProfile(draft, msg, sender, ctx);
+      return players.handleUpdateProfile(draft, msg, player(), ctx);
     case 'setSettings':
-      return players.handleSetSettings(draft, msg, sender, ctx);
+      return players.handleSetSettings(draft, msg, player(), ctx);
     case 'leave':
-      return players.handleLeave(draft, msg, sender, ctx);
+      return players.handleLeave(draft, msg, player(), ctx);
     case 'removePlayer':
-      return players.handleRemovePlayer(draft, msg, sender, ctx);
+      return players.handleRemovePlayer(draft, msg, player(), ctx);
     case 'reclaim':
-      return players.handleReclaim(draft, msg, sender, ctx);
+      return reclaim.handleReclaim(draft, msg, sender, ctx);
     case 'cancelReclaim':
-      return players.handleCancelReclaim(draft, msg, sender, ctx);
+      return reclaim.handleCancelReclaim(draft, msg, requester(), ctx);
     case 'answerReclaim':
-      return players.handleAnswerReclaim(draft, msg, sender, ctx);
+      return reclaim.handleAnswerReclaim(draft, msg, player(), ctx);
     case 'start':
-      return rounds.handleStart(draft, msg, sender, ctx);
+      return rounds.handleStart(draft, msg, player(), ctx);
     case 'submit':
-      return rounds.handleSubmit(draft, msg, sender, ctx);
+      return rounds.handleSubmit(draft, msg, player(), ctx);
     case 'advance':
-      return rounds.handleAdvance(draft, msg, sender, ctx);
+      return rounds.handleAdvance(draft, msg, player(), ctx);
     case 'end':
-      return rounds.handleEnd(draft, msg, sender, ctx);
+      return rounds.handleEnd(draft, msg, player(), ctx);
     default:
       return assertNever(msg);
   }
+}
+
+/**
+ * The sender of a 'player' message. The ONE place that turns "the rule said player" into a typed
+ * sender — so no handler re-checks it. Throwing here means MESSAGE_RULES and the switch disagree.
+ */
+function asPlayer(draft: GameState, sender: Sender): PlayerSender {
+  const player = sender.playerId === undefined ? undefined : draft.players[sender.playerId];
+  if (sender.playerId === undefined || player === undefined)
+    throw new Error('Engine contract broken: player message without a player');
+  return { connId: sender.connId, playerId: sender.playerId, player };
+}
+
+function asRequester(sender: Sender): RequesterSender {
+  if (sender.reclaimRequestId === undefined)
+    throw new Error('Engine contract broken: requester message without a request');
+  return { connId: sender.connId, requestId: sender.reclaimRequestId };
 }
 
 function senderMatches(draft: GameState, sender: Sender, kind: SenderKind): boolean {

@@ -13,6 +13,7 @@ import {
   type CreateGameResponse,
   GameIdSchema,
   GameKeySchema,
+  ID_SOURCE,
   PlayerIdSchema,
   type GameKey,
   type PlayerId,
@@ -26,7 +27,7 @@ import { servePhoto, uploadPhoto } from './photos/photoRoutes';
 export { GameObject };
 
 const KEY = `[${GAME_KEY_ALPHABET}]{${String(GAME_KEY_LENGTH)}}`;
-const ID = '[0-9A-Za-z]{12}';
+const ID = ID_SOURCE;
 const WS_PATH = new RegExp(`^/ws/(${KEY})$`);
 const PHOTO_UPLOAD = new RegExp(`^/api/games/(${KEY})/photos/(${ID})$`);
 const PHOTO_DOWNLOAD = new RegExp(`^/api/games/(${KEY})/(${ID})/photos/(${ID})$`);

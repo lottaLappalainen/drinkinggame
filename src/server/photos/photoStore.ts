@@ -6,6 +6,12 @@ import type { PlayerId } from '../../shared/protocol';
 export type PhotoContentType = 'image/jpeg' | 'image/webp';
 
 export type StoredPhoto = {
+  /**
+   * The photoVersion these bytes were saved as. A download for `?v=N` is served only if the stored
+   * bytes ARE version N: the URL is cached forever, so it must never return a later picture (e.g.
+   * if saving the new version's bytes succeeded but publishing the version failed).
+   */
+  readonly version: number;
   readonly contentType: PhotoContentType;
   readonly bytes: Uint8Array;
 };
@@ -23,13 +29,14 @@ export function putPhoto(kv: SyncKvStorage, playerId: PlayerId, photo: StoredPho
 export function getPhoto(kv: SyncKvStorage, playerId: PlayerId): StoredPhoto | undefined {
   const stored: unknown = kv.get(photoKey(playerId));
   if (typeof stored !== 'object' || stored === null) return undefined;
-  const { contentType, bytes } = stored as Partial<Record<keyof StoredPhoto, unknown>>;
+  const { version, contentType, bytes } = stored as Partial<Record<keyof StoredPhoto, unknown>>;
   if (
+    typeof version !== 'number' ||
     (contentType !== 'image/jpeg' && contentType !== 'image/webp') ||
     !(bytes instanceof Uint8Array)
   )
     return undefined;
-  return { contentType, bytes };
+  return { version, contentType, bytes };
 }
 
 /**

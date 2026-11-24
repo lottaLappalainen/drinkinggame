@@ -404,7 +404,7 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
       { ready: [P.ville] },
       { playerId: P.late, submitted: false },
       {
-        players: [...sixPlayers(), player(P.late, 'Late Lauri', { waitingForNextRound: true })],
+        players: [...sixPlayers(), player(P.late, 'Late Lauri')],
       },
     ),
   },

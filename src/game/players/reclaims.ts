@@ -7,7 +7,8 @@ import type {
   RequestId,
   ServerMessage,
 } from '../../shared/protocol';
-import { send, toHost, unbind } from '../effects';
+import { WS_CLOSE } from '../../shared/constants';
+import { close, send, toHost, unbind } from '../effects';
 import { entriesOf } from '../ids';
 import type { GameState, ReclaimState } from '../stateSchema';
 import type { Effect } from '../types';
@@ -37,6 +38,24 @@ export function pendingReclaimMessages(state: GameState): ServerMessage[] {
 /** The open socket of the phone waiting on this request, if it is connected. */
 export function requesterConnection(state: GameState, requestId: RequestId): ConnId | undefined {
   return entriesOf(state.connections).find(([, c]) => c.reclaimRequestId === requestId)?.[0];
+}
+
+/**
+ * A requester's phone came back on `connId`: every OTHER socket still waiting on the request is
+ * told REPLACED and closed, exactly like a player's old socket (G-18). Only the newest socket waits.
+ */
+export function replaceRequesterSockets(
+  state: GameState,
+  requestId: RequestId,
+  connId: ConnId,
+): Effect[] {
+  return entriesOf(state.connections)
+    .filter(([id, c]) => id !== connId && c.reclaimRequestId === requestId)
+    .flatMap(([id]) => [
+      release(state, id),
+      send(id, { type: 'error', code: 'REPLACED' }),
+      close(id, WS_CLOSE.REPLACED, 'replaced'),
+    ]);
 }
 
 /** Detach a requester socket from its request: it is an anonymous connection again. */

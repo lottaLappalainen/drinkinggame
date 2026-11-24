@@ -4,7 +4,7 @@ import { PROTOCOL_VERSION, RECLAIM_TTL_MS } from '../../../src/shared/constants'
 import type { RequestId } from '../../../src/shared/protocol';
 import { C, P } from '../../fixtures/common';
 import { fakeTokenHash, lobbyState } from '../../fixtures/states';
-import { broadcasts, conn, only, sentTo, session, toHostMessages, types } from './session';
+import { broadcasts, closed, conn, only, sentTo, session, toHostMessages, types } from './session';
 
 const REQUESTER_TOKEN = 50;
 const REQ = conn('requester');
@@ -141,6 +141,20 @@ describe('the host answers', () => {
 });
 
 describe('across reconnects (screen lock, restart)', () => {
+  it('a requester back on a new socket while the old one is still open: only the new one waits', () => {
+    const { game, requestId } = sannaRequested();
+    const fresh = conn('requester-new');
+    // iOS keeps the old socket open after a screen lock; the phone reconnects on a new one.
+    const back = game.hello(fresh, REQUESTER_TOKEN);
+    expect(sentTo(back, REQ)).toEqual([{ type: 'error', code: 'REPLACED' }]);
+    expect(closed(back)).toEqual([REQ]);
+    expect(sentTo(back, fresh)).toEqual([{ type: 'reclaimPending', requestId }]);
+    // The answer reaches the phone that is really there — not the dead socket.
+    const denied = game.send(C.mikko, answer(requestId, false));
+    expect(sentTo(denied, fresh)).toEqual([{ type: 'reclaimResult', approved: false }]);
+    expect(sentTo(denied, REQ)).toEqual([]);
+  });
+
   it('a reconnecting requester is waiting again', () => {
     const { game, requestId } = sannaRequested();
     game.close(REQ);

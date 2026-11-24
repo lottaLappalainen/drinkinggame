@@ -11,6 +11,7 @@ import {
   ROUND_MS,
 } from '../../../src/shared/constants';
 import type { ConnId, PlayerId } from '../../../src/shared/protocol';
+import { isWaitingForNextRound } from '../../../src/shared/ready';
 import { C, P } from '../../fixtures/common';
 import { lobbyState, lobbyWithReclaimState } from '../../fixtures/states';
 import { broadcasts, conn, only, sentTo, session, toHostMessages, types } from '../players/session';
@@ -102,7 +103,7 @@ describe('starting the game (G-21, G-22, G-23, G-31)', () => {
     game.send(C.ville, { type: 'leave' });
     game.send(C.sanna, { type: 'leave' });
     const messages = sentTo(game.send(C.mikko, { type: 'start' }), C.mikko);
-    expect(messages).toEqual([{ type: 'error', code: 'NOT_ALLOWED', for: 'start' }]);
+    expect(messages).toEqual([{ type: 'error', code: 'NOT_ENOUGH_PLAYERS', for: 'start' }]);
     expect(game.state.phase).toBe('LOBBY');
     expect(game.state.questions).toEqual([]);
   });
@@ -153,7 +154,7 @@ describe('answering (G-36, G-37, G-38)', () => {
   it('before the answer window opens it is refused (the intro shows only the question)', () => {
     const game = started();
     const messages = sentTo(submit(game, C.aino), C.aino);
-    expect(messages).toEqual([{ type: 'error', code: 'NOT_ALLOWED', for: 'submit' }]);
+    expect(messages).toEqual([{ type: 'error', code: 'TOO_EARLY', for: 'submit' }]);
     expect(game.state.round?.answers).toEqual({});
   });
 
@@ -341,7 +342,10 @@ describe("the host's Next and Finish (G-45)", () => {
     for (const c of ALL) submit(game, c);
     const ends = round(game).results?.revealEndsAt ?? 0;
     game.wait(ends - 600 - game.now);
-    expect(next(game)).toEqual([]); // 600 ms early: ignored, still the results
+    // 600 ms early: refused (the phone re-enables Next), still the results
+    expect(sentTo(next(game), C.mikko)).toEqual([
+      { type: 'error', code: 'TOO_EARLY', for: 'advance' },
+    ]);
     expect(game.state.phase).toBe('RESULTS');
     game.wait(200);
     expect(types(broadcasts(next(game)))).toEqual(['roundStarted']); // 400 ms early: fine
@@ -366,7 +370,8 @@ describe("the host's Next and Finish (G-45)", () => {
     const game = started();
     playRound(game);
     const effects = game.hello(conn('late'), 9, { nickname: 'Late' });
-    expect(only(broadcasts(effects), 'playerJoined').player.waitingForNextRound).toBe(true);
+    const joined = only(broadcasts(effects), 'playerJoined').player;
+    expect(isWaitingForNextRound(joined.playerId, joined.status, game.state.round)).toBe(true);
     const { round: shown } = only(broadcasts(next(game)), 'roundStarted');
     const lateId = game.playerWithToken(9);
     expect(lateId).toBeDefined();
@@ -407,7 +412,7 @@ describe("the host's Next and Finish (G-45)", () => {
     const paused = game.send(C.sanna, { type: 'leave' });
     expect(types(broadcasts(paused))).toContain('paused');
     expect(sentTo(next(game), C.mikko)).toEqual([
-      { type: 'error', code: 'NOT_ALLOWED', for: 'advance' },
+      { type: 'error', code: 'PAUSED', for: 'advance' },
     ]);
     expect(game.state.phase).toBe('RESULTS');
 

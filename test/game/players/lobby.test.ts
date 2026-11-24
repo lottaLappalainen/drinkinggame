@@ -1,6 +1,6 @@
 // 3A: profiles and settings in the lobby, leaving, removing, the pause flag, and the snapshot.
 import { describe, expect, it } from 'vitest';
-import { buildSnapshot } from '../../../src/game/handlers/players';
+import { buildSnapshot } from '../../../src/game/players/view';
 import {
   MIN_PLAYERS,
   PODIUM_MIN_PLAYERS,
@@ -124,7 +124,7 @@ describe('game mode (G-24)', () => {
   it(`Podium can be chosen only with ${String(PODIUM_MIN_PLAYERS)}+ active players`, () => {
     const six = lobbyOf(PODIUM_MIN_PLAYERS - 1);
     expect(sentTo(six.send(C.mikko, { type: 'setSettings', settings: podium }), C.mikko)).toEqual([
-      { type: 'error', code: 'NOT_ALLOWED', for: 'setSettings' },
+      { type: 'error', code: 'NOT_ENOUGH_PLAYERS', for: 'setSettings' },
     ]);
     expect(six.state.settings.mode).toBe('spotlight');
 
@@ -152,7 +152,7 @@ describe('game mode (G-24)', () => {
       ),
     ).toEqual(['settingsChanged']);
     expect(sentTo(game.send(C.mikko, { type: 'start' }), C.mikko)).toEqual([
-      { type: 'error', code: 'NOT_ALLOWED', for: 'start' },
+      { type: 'error', code: 'NOT_ENOUGH_PLAYERS', for: 'start' },
     ]);
     expect(game.state.phase).toBe('LOBBY');
 

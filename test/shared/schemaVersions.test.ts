@@ -20,7 +20,7 @@ const STATE_FINGERPRINTS: Readonly<Record<number, string>> = {
 
 const PROTOCOL_FINGERPRINTS: Readonly<Record<number, string>> = {
   1: '1ac544e07e9f68bb', // contracts before any phone ran a game (only the echo page was deployed); setSettings, join object, leftGame, question categories, MAX_CANDIDATES 6, reveal kinds bottom/third/second/top added without a bump
-  2: '16443b68ebb12e6d', // 2026-11-24: settings.mode + add-on categories, round.spots, candidates/ranking up to MAX_PLAYERS, results noVotes instead of stats, no questionCounts
+  2: '16049a3c5965545a', // 2026-11-24: settings.mode + add-on categories, round.spots, candidates/ranking up to MAX_PLAYERS, results noVotes instead of stats, no questionCounts; then (same day, version 2 still deployed nowhere) error codes NOT_ENOUGH_PLAYERS / PAUSED / TOO_EARLY, no waitingForNextRound
 };
 
 /** A stable description of a Valibot schema's structure (kinds, keys, literals, checks). */
