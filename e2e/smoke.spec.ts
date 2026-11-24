@@ -89,6 +89,10 @@ test('three phones play a whole round', async ({ page: host, browser }, testInfo
     });
   await expect(host.getByRole('button', { name: 'Next question' })).toBeEnabled();
   await expect(aino.getByText('Waiting for the host…')).toBeVisible();
+  // The list says which way it runs (the question's own words) and starts with the 1st place.
+  await expect(host.getByText(/^From most( likely)? to least( likely)?$/)).toBeVisible();
+  const ranking = host.getByRole('list', { name: 'The full ranking' });
+  await expect(ranking.getByRole('listitem').first()).toContainText('1st');
 });
 
 test('the screen gallery renders every fixture without errors', async ({ page }) => {

@@ -14,7 +14,7 @@ import type {
 } from '../../shared/protocol';
 import { MIN_ANSWERS_FOR_RANKING, REVEAL_RULE_DELAY_MS } from '../../shared/constants';
 import { DRINK_RULES } from '../../shared/drinkRules';
-import { NO_VOTES_LABEL, placeLabel } from '../../shared/questionLabels';
+import { NO_VOTES_LABEL, placeLabel, rankingOrderLabel } from '../../shared/questionLabels';
 import { nextRevealChangeAt, revealPosition, revealStepStartsAt } from '../../shared/reveal';
 import { isPartialRanking } from '../../shared/spots';
 import { STRINGS } from '../strings';
@@ -31,6 +31,7 @@ import {
   type PhotoSource,
 } from '../ui/Game';
 import { Center, Row, Screen, Spacer, Stack } from '../ui/Layout';
+import { PlaceNumber } from '../ui/PlaceNumber';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
 import { GameMenu, PausedBanner, photoSource, ReclaimPrompts, RoundHeader } from './parts';
@@ -170,7 +171,7 @@ function Ranked(props: {
       return (
         <FullRanking
           results={results}
-          labelOf={(place) => placeLabel(labels, place, lastPlace)}
+          orderLabel={rankingOrderLabel(labels, partial)}
           players={players}
           source={source}
           me={snapshot.you.playerId}
@@ -188,11 +189,14 @@ const SETTLED_MS = -60_000;
 
 /**
  * After the reveal: everyone with a place (revealed places keep their drinking rule, D-6), then
- * (Podium) the "No votes" group. If the viewer has a rule, it's repeated on top.
+ * (Podium) the "No votes" group. If the viewer has a rule, it's repeated on top. Each row starts
+ * with its place number (medals for 1–3, ties share them); a line under the heading says which way
+ * the list runs, so the rows need no place words.
  */
 function FullRanking(props: {
   results: RankedResults;
-  labelOf: (place: number) => string;
+  /** "From most likely to least likely" — shared/questionLabels.ts `rankingOrderLabel`. */
+  orderLabel: string;
   players: (ids: readonly PlayerId[]) => PublicPlayer[];
   source: PhotoSource;
   me: PlayerId;
@@ -220,7 +224,10 @@ function FullRanking(props: {
           />
         </Center>
       )}
-      <Heading level={2}>{STRINGS.results.fullRanking}</Heading>
+      <Stack gap="1">
+        <Heading level={2}>{STRINGS.results.fullRanking}</Heading>
+        <Text variant="small">{props.orderLabel}</Text>
+      </Stack>
       <PlayerList
         label={STRINGS.results.fullRanking}
         items={ranked.map(({ player, place }) => {
@@ -228,17 +235,17 @@ function FullRanking(props: {
           return {
             key: player.playerId,
             content: (
-              <PlayerChip
-                player={player}
-                source={props.source}
-                isYou={player.playerId === props.me}
-                meta={
-                  <Row gap="2">
-                    <Text variant="small">{`${String(place)}. ${props.labelOf(place)}`}</Text>
-                    {rule !== undefined && <DrinkChip rule={rule} />}
-                  </Row>
-                }
-              />
+              <Row gap="3">
+                <PlaceNumber place={place} />
+                <Stack grow gap="0">
+                  <PlayerChip
+                    player={player}
+                    source={props.source}
+                    isYou={player.playerId === props.me}
+                    meta={rule !== undefined && <DrinkChip rule={rule} />}
+                  />
+                </Stack>
+              </Row>
             ),
           };
         })}
