@@ -1,14 +1,16 @@
-// Screen 2 — Home: host or join; "Return to game" for games this phone is still in (G-17).
+// Screen 2 — Home: host or join; "Return to game" for games this phone is still in (G-17). The
+// light/dark choice (G-7) lives here and nowhere else (user decision 2026-11-25).
 import { useState } from 'preact/hooks';
 import { GAME_KEY_LENGTH } from '../../shared/constants';
 import type { GameKey } from '../../shared/protocol';
-import { isGameKey, type Profile } from '../storage';
+import { isGameKey, type Profile, type Storage } from '../storage';
 import { STRINGS } from '../strings';
 import { Button, TextInput } from '../ui/Controls';
 import { Card } from '../ui/Feedback';
 import { Avatar } from '../ui/Game';
 import { Row, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
+import { ThemePicker } from './parts';
 
 export function HomeScreen(props: {
   profile: Profile;
@@ -19,6 +21,8 @@ export function HomeScreen(props: {
   onJoin: (key: GameKey) => void;
   onReturn: (key: GameKey) => void;
   onEditProfile: () => void;
+  /** For the light/dark choice; null in the gallery (nothing saved). */
+  storage: Storage | null;
 }) {
   const [key, setKey] = useState('');
   const normalized = key.trim().toUpperCase();
@@ -83,6 +87,10 @@ export function HomeScreen(props: {
         </form>
       </Card>
       <Spacer />
+      <Stack gap="2">
+        <Text variant="label">{STRINGS.theme.label}</Text>
+        <ThemePicker storage={props.storage} />
+      </Stack>
     </Screen>
   );
 }

@@ -37,11 +37,11 @@ describe('CSS Modules (typed-classes decision, 2026-11-24)', () => {
 });
 
 describe('screen rules decided by the user', () => {
-  it('the theme picker (System / Light / Dark) is only on the Profile screen (2026-11-25)', () => {
+  it('the theme picker (System / Light / Dark) is only on the Home screen (host / join, 2026-11-25)', () => {
     const users = files(join(CLIENT, 'screens'), /\.tsx$/)
       .filter((file) => /<ThemePicker\b/.test(read(file)))
       .map(rel);
-    expect(users).toEqual(['src/client/screens/ProfileScreen.tsx']);
+    expect(users).toEqual(['src/client/screens/HomeScreen.tsx']);
   });
 });
 

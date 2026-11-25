@@ -7,14 +7,13 @@ import type { PresetId } from '../../shared/avatars';
 import { NICKNAME_MAX_GRAPHEMES, NICKNAME_MAX_INPUT_CHARS } from '../../shared/constants';
 import { validateNickname } from '../../shared/nickname';
 import { preparePhoto } from '../media/photo';
-import type { Profile, Storage } from '../storage';
+import type { Profile } from '../storage';
 import { STRINGS } from '../strings';
 import { Button, TextInput } from '../ui/Controls';
 import { AvatarPicker, Avatar } from '../ui/Game';
 import { Center, Screen, Stack } from '../ui/Layout';
 import { PhotoPicker } from '../ui/PhotoPicker';
 import { Heading, Text } from '../ui/Text';
-import { ThemePicker } from './parts';
 
 export function ProfileScreen(props: {
   initial: Profile;
@@ -23,7 +22,6 @@ export function ProfileScreen(props: {
   submitLabel: string;
   onSave: (profile: Profile, photo: string | null) => void;
   onCancel?: () => void;
-  storage: Storage | null;
 }) {
   const [nickname, setNickname] = useState(props.initial.nickname);
   const [presetId, setPresetId] = useState<PresetId>(props.initial.presetId);
@@ -88,10 +86,6 @@ export function ProfileScreen(props: {
         {photo !== null && <Text variant="small">{STRINGS.profile.photoInUse}</Text>}
         <Text variant="small">{STRINGS.profile.photoOr}</Text>
         <PhotoPicker onFile={onFile} busy={photoBusy} error={photoError} />
-      </Stack>
-      <Stack gap="2">
-        <Text variant="label">{STRINGS.theme.label}</Text>
-        <ThemePicker storage={props.storage} />
       </Stack>
       <Stack gap="2">
         <Button

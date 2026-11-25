@@ -52,7 +52,6 @@ export function App() {
             ? STRINGS.profile.saveAndJoin
             : STRINGS.profile.save
         }
-        storage={storage}
         {...(profile !== null && {
           onCancel: () => {
             setEditing(false);
@@ -104,6 +103,7 @@ function Home(props: { profile: Profile; onEditProfile: () => void }) {
       creating={store.creating.value}
       createError={store.createError.value}
       onEditProfile={props.onEditProfile}
+      storage={storage}
       onReturn={(key) => {
         navigate(gamePath(key));
       }}

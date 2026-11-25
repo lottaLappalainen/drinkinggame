@@ -357,7 +357,6 @@ function ScreenGallery() {
           initialPhoto={null}
           submitLabel="Save"
           onSave={noop}
-          storage={null}
         />
       </Frame>
       <Frame name="home" screen="2 Home with a game to return to">
@@ -370,6 +369,7 @@ function ScreenGallery() {
           onJoin={noop}
           onReturn={noop}
           onEditProfile={noop}
+          storage={null}
         />
       </Frame>
       <Frame name="connecting" screen="Connecting / reconnecting">
