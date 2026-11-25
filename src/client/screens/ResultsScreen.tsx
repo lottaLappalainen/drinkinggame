@@ -5,6 +5,7 @@
 // group. The host's Next unlocks exactly at revealEndsAt (never the server's early tolerance).
 // Each step announces its drinking rule a beat after the names (D-6); the full ranking keeps the
 // rules next to the revealed places until Next.
+import type { ComponentChildren } from 'preact';
 import type {
   DrinkRule,
   PlayerId,
@@ -32,6 +33,7 @@ import {
 } from '../ui/Game';
 import { Center, Row, Screen, Spacer, Stack } from '../ui/Layout';
 import { PlaceNumber } from '../ui/PlaceNumber';
+import { PodiumTray } from '../ui/Podium';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
 import { GameMenu, PausedBanner, photoSource, ReclaimPrompts, RoundHeader } from './parts';
@@ -121,21 +123,35 @@ function Ranked(props: {
   const players = (ids: readonly PlayerId[]) =>
     ids.map((id) => byId.get(id)).filter((p): p is PublicPlayer => p !== undefined);
 
+  // 3rd and 2nd place stay on screen in the podium tray once their own step is over (G-50). Every
+  // reveal position below uses the same layout, so the tray stays mounted and its cards don't
+  // replay their entrance at each step change.
+  const revealedUpTo =
+    position.kind === 'step'
+      ? position.index - 1
+      : position.kind === 'drumroll'
+        ? position.afterStep
+        : -1;
+  const podium = results.steps
+    .slice(0, revealedUpTo + 1)
+    .filter((step) => step.kind === 'third' || step.kind === 'second')
+    .map((step) => ({ place: step.place, players: players(step.playerIds) }));
+  const withTray = (main: ComponentChildren) => (
+    <Stack grow gap="5">
+      <Center grow>{main}</Center>
+      <PodiumTray entries={podium} source={source} label={STRINGS.results.podiumSoFar} />
+    </Stack>
+  );
+
   switch (position.kind) {
     case 'pending':
-      return (
-        <Center grow>
-          <Heading level={2} center>
-            {STRINGS.results.revealing}
-          </Heading>
-        </Center>
+      return withTray(
+        <Heading level={2} center>
+          {STRINGS.results.revealing}
+        </Heading>,
       );
     case 'drumroll':
-      return (
-        <Center grow>
-          <Drumroll />
-        </Center>
-      );
+      return withTray(<Drumroll />);
     case 'step': {
       const step = results.steps[position.index];
       if (step === undefined) return null;
@@ -145,26 +161,24 @@ function Ranked(props: {
         results.steps.length,
         position.index,
       );
-      return (
-        <Center grow>
-          <RevealStep
-            key={position.index}
-            label={placeLabel(labels, step.place, lastPlace)}
-            players={players(step.playerIds)}
-            source={source}
-            top={step.kind === 'top'}
-            rule={
-              step.rule === null
-                ? undefined
-                : {
-                    kind: step.kind,
-                    rule: step.rule,
-                    appearInMs: stepStartsAt + REVEAL_RULE_DELAY_MS - props.now,
-                  }
-            }
-            you={step.playerIds.includes(me)}
-          />
-        </Center>
+      return withTray(
+        <RevealStep
+          key={position.index}
+          label={placeLabel(labels, step.place, lastPlace)}
+          players={players(step.playerIds)}
+          source={source}
+          top={step.kind === 'top'}
+          rule={
+            step.rule === null
+              ? undefined
+              : {
+                  kind: step.kind,
+                  rule: step.rule,
+                  appearInMs: stepStartsAt + REVEAL_RULE_DELAY_MS - props.now,
+                }
+          }
+          you={step.playerIds.includes(me)}
+        />,
       );
     }
     case 'done':
@@ -233,10 +247,12 @@ function FullRanking(props: {
         </Stack>
         <PlayerList
           label={STRINGS.results.fullRanking}
+          entrance
           items={ranked.map(({ player, place }) => {
             const rule = rules.get(player.playerId);
             return {
               key: player.playerId,
+              winner: place === 1, // rises from where the gold card was (G-50)
               content: (
                 <Row gap="3">
                   <PlaceNumber place={place} />

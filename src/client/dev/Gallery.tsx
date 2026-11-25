@@ -42,6 +42,7 @@ import { DRINK_RULES } from '../../shared/drinkRules';
 import { Dock, Row, Stack } from '../ui/Layout';
 import { PhotoPicker } from '../ui/PhotoPicker';
 import { PlaceNumber } from '../ui/PlaceNumber';
+import { PodiumTray } from '../ui/Podium';
 import { QrCode } from '../ui/QrCode';
 import { Heading, Text } from '../ui/Text';
 import styles from './Gallery.module.css';
@@ -250,6 +251,15 @@ function Components() {
             <PlaceNumber key={i} place={place} />
           ))}
         </Row>
+      </Section>
+      <Section title="Podium tray (3rd and 2nd stay on screen during the reveal; a tie shares a card)">
+        <PodiumTray
+          label="Revealed so far"
+          entries={[
+            { place: 3, players: SIX.slice(3, 4) },
+            { place: 2, players: SIX.slice(1, 3) },
+          ]}
+        />
       </Section>
       <Section title="Reveal (with the drinking rule a beat after the names)">
         <RevealStep

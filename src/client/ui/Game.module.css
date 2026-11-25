@@ -118,6 +118,24 @@
   background: var(--color-surface);
 }
 
+/* The full ranking's entrance (PlayerList `entrance`): first place rises to the top, then the rest. */
+.listItemWinner {
+  position: relative;
+  z-index: 1;
+  animation: winner-rise var(--dur-winner-rise) var(--ease-out) both;
+}
+
+.listItemAfter {
+  animation: enter-gentle var(--dur-slow) var(--ease-out)
+    calc(var(--dur-winner-rise) + var(--i) * var(--list-stagger)) both;
+}
+
+@keyframes winner-rise {
+  from {
+    transform: translateY(var(--winner-rise-from)) scale(var(--winner-rise-scale));
+  }
+}
+
 .countdown {
   position: relative;
   height: var(--countdown-height);

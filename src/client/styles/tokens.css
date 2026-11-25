@@ -149,6 +149,18 @@
   --confetti-drift: 15vw; /* the most a piece drifts sideways */
   --dur-confetti: 2800ms;
 
+  /* The reveal podium (ui/Podium) and the full ranking entrance (PlayerList entrance) */
+  --podium-card-width: 6.5rem;
+  --podium-card-height: 7.5rem; /* reserved below the big card, so it never jumps */
+  --podium-fly-x: -30vw; /* a tray card starts in the middle of the screen... */
+  --podium-fly-y: -30vh;
+  --podium-fly-scale: 1.8; /* ...and big, like the card it replaces */
+  --dur-podium-fly: 600ms;
+  --winner-rise-from: 30vh; /* first place rises from the middle to the top of the list */
+  --winner-rise-scale: 1.3;
+  --dur-winner-rise: 600ms;
+  --list-stagger: 60ms; /* then the other rows appear one after another */
+
   /* ── Motion ── (one place to make the whole app snappier or calmer) */
   --dur-fast: 150ms;
   --dur-base: 250ms;
@@ -210,6 +222,9 @@
     --dur-slow: 1ms;
     --dur-reveal: 1ms;
     --dur-roll: 1ms;
+    --dur-podium-fly: 1ms;
+    --dur-winner-rise: 1ms;
+    --list-stagger: 0ms;
     --pop-scale: 1;
     --press-scale: 1;
     --lift-distance: 0;

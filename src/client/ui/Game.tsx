@@ -144,17 +144,38 @@ export function PlayerChip(props: {
 
 /** A list of rows that glide when they reorder and pop in when someone joins. */
 export function PlayerList(props: {
-  items: readonly { key: string; content: ComponentChildren }[];
+  /** `winner`: with `entrance`, this row rises into place first (first place after the reveal). */
+  items: readonly { key: string; content: ComponentChildren; winner?: boolean }[];
   label: string;
+  /**
+   * The full ranking right after the reveal (G-50): the winner rows rise from the middle of the
+   * screen to the top of the list, then the other rows appear one after another.
+   */
+  entrance?: boolean;
 }) {
   const ref = useFlip<HTMLUListElement>();
+  let after = 0;
   return (
     <ul ref={ref} class={styles.list} aria-label={props.label}>
-      {props.items.map((item) => (
-        <li key={item.key} data-flip={item.key} class={styles.listItem}>
-          {item.content}
-        </li>
-      ))}
+      {props.items.map((item) => {
+        const winner = props.entrance === true && item.winner === true;
+        const index = props.entrance === true && !winner ? after++ : null;
+        return (
+          <li
+            key={item.key}
+            data-flip={item.key}
+            class={cx(
+              styles.listItem,
+              winner && styles.listItemWinner,
+              index !== null && styles.listItemAfter,
+            )}
+            // eslint-disable-next-line no-restricted-syntax -- the row's turn in the stagger, as a CSS variable only (CLAUDE.md §7 allows this)
+            style={index === null ? undefined : { '--i': String(index) }}
+          >
+            {item.content}
+          </li>
+        );
+      })}
     </ul>
   );
 }

@@ -127,6 +127,7 @@ export const STRINGS = {
   },
   results: {
     revealing: 'And the group says…',
+    podiumSoFar: 'Revealed so far',
     fullRanking: 'The full ranking',
     notEnough: 'Not enough answers',
     notEnoughBody: (min: number) =>
