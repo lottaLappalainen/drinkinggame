@@ -121,6 +121,14 @@ export function checkInvariants(state: GameState): string[] {
       if (!categories.includes(question.category))
         fail(`question ${question.id} is from a category that wasn't chosen (G-22)`);
   }
+  // "Play again" (G-52): every asked question is remembered, once.
+  if (new Set(state.playedQuestionIds).size !== state.playedQuestionIds.length)
+    fail('playedQuestionIds lists a question twice');
+  if (round !== null) {
+    const asked = state.questions[round.index];
+    if (asked !== undefined && !state.playedQuestionIds.includes(asked.id))
+      fail(`question ${asked.id} is being asked but isn't in playedQuestionIds`);
+  }
 
   // ── Tokens (G-44) ────────────────────────────────────────────────────────
   // A superseded token must never also be someone's current token (it would both resume a player

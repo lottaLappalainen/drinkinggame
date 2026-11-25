@@ -387,7 +387,7 @@ function MessageScreen(props: { fixture: MessageFixture }) {
   const exitProps = { onHome: noop, onUseHere: noop, onJoinAgain: noop, onRefresh: noop };
   switch (message.type) {
     case 'gameEnded':
-      return <EndedScreen reason={message.reason} onHome={noop} />;
+      return <EndedScreen reason={message.reason} isHost={false} onHome={noop} />;
     case 'reclaimPending':
       return <ReclaimScreen state={{ status: 'pending' }} onCancel={noop} onHome={noop} />;
     case 'reclaimResult':

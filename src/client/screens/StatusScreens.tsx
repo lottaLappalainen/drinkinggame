@@ -8,6 +8,7 @@ import { Button, TextInput } from '../ui/Controls';
 import { Banner, Spinner } from '../ui/Feedback';
 import { Center, Screen, Spacer, Stack } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
+import { useEnv } from './env';
 import { useState } from 'preact/hooks';
 import { validateNickname } from '../../shared/nickname';
 import { MAX_PLAYERS, NICKNAME_MAX_INPUT_CHARS } from '../../shared/constants';
@@ -18,8 +19,14 @@ const END_REASON_TEXT: Record<EndReason, string> = {
   updated: STRINGS.ended.updated,
 };
 
-/** Screen 6 — Game Over (G-47). The summary arrives with U3. */
-export function EndedScreen(props: { reason: EndReason; onHome: () => void }) {
+/**
+ * Screen 6 — Game Over (G-47). The summary arrives with U3. The host can take the same group back
+ * to a fresh lobby ("Play again", G-52); the others are told so. Not after an update: that game
+ * was replaced and has nobody to bring along.
+ */
+export function EndedScreen(props: { reason: EndReason; isHost: boolean; onHome: () => void }) {
+  const env = useEnv();
+  const canPlayAgain = props.reason !== 'updated';
   return (
     <Screen center label={STRINGS.ended.title}>
       <Center grow>
@@ -32,9 +39,36 @@ export function EndedScreen(props: { reason: EndReason; onHome: () => void }) {
           </Text>
         </Stack>
       </Center>
-      <Button size="lg" block onClick={props.onHome}>
-        {STRINGS.ended.backHome}
-      </Button>
+      <Stack gap="2">
+        {canPlayAgain && props.isHost && (
+          <>
+            <Button
+              size="lg"
+              block
+              busy={env.pending.has('playAgain')}
+              onClick={env.actions.playAgain}
+            >
+              {STRINGS.ended.playAgain}
+            </Button>
+            <Text variant="small" center>
+              {STRINGS.ended.playAgainHint}
+            </Text>
+          </>
+        )}
+        {canPlayAgain && !props.isHost && (
+          <Text variant="muted" center live>
+            {STRINGS.ended.waitingForPlayAgain}
+          </Text>
+        )}
+        <Button
+          size="lg"
+          block
+          variant={canPlayAgain && props.isHost ? 'ghost' : 'primary'}
+          onClick={props.onHome}
+        >
+          {STRINGS.ended.backHome}
+        </Button>
+      </Stack>
     </Screen>
   );
 }

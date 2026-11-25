@@ -138,6 +138,16 @@
   --z-toast: 200;
   --z-drag: 300; /* the player under the finger, above everything */
   --z-pinned: 10; /* the Podium spots pinned above the scrolling list */
+  --z-confetti: -1; /* behind the page content, above the page background */
+
+  /* Confetti for the "most likely" reveal (ui/Confetti) */
+  --confetti-piece-width: 0.5rem;
+  --confetti-piece-height: 0.875rem;
+  --confetti-piece-radius: 0.125rem;
+  --confetti-start: -5vh; /* pieces start just above the screen */
+  --confetti-fall: 105vh;
+  --confetti-drift: 15vw; /* the most a piece drifts sideways */
+  --dur-confetti: 2800ms;
 
   /* ── Motion ── (one place to make the whole app snappier or calmer) */
   --dur-fast: 150ms;

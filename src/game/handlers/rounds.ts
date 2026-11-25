@@ -1,4 +1,4 @@
-// Round-side game logic (Phase 3B): Start, answers, Next / Finish, End, the round-end deadline and
+// Round-side game logic (Phase 3B): Start, answers, Next / Finish, End, Play again, the round-end deadline and
 // "who is here" consequences (pause, early round end).
 //
 // This file only decides WHO may do WHAT and WHEN; the transitions live in game/rounds/round.ts,
@@ -13,7 +13,13 @@ import { acceptsAnswers } from '../../shared/timeline';
 import { broadcast, errorTo } from '../effects';
 import { activePlayers } from '../players/presence';
 import { drawQuestions } from '../rounds/draw';
-import { closeRound, closeRoundIfEveryoneReady, endGame, startRound } from '../rounds/round';
+import {
+  closeRound,
+  closeRoundIfEveryoneReady,
+  endGame,
+  reopenLobby,
+  startRound,
+} from '../rounds/round';
 import type { GameState, RoundState } from '../stateSchema';
 import type { Ctx, Effect, EngineMessageOf, PlayerSender } from '../types';
 
@@ -34,7 +40,14 @@ export function handleStart(
   const active = activePlayers(draft).length;
   const needed = draft.settings.mode === 'podium' ? PODIUM_MIN_PLAYERS : MIN_PLAYERS;
   if (active < needed) return [errorTo(sender.connId, 'NOT_ENOUGH_PLAYERS', 'start')];
-  const questions = drawQuestions(draft.settings.categories, draft.settings.gameLength, ctx.random);
+  const questions = drawQuestions(
+    draft.settings.categories,
+    draft.settings.gameLength,
+    ctx.random,
+    {
+      played: draft.playedQuestionIds,
+    },
+  );
   if (questions === null) return [errorTo(sender.connId, 'NOT_ENOUGH_QUESTIONS', 'start')];
   draft.questions = questions;
   return startRound(draft, ctx, 1);
@@ -103,6 +116,20 @@ export function handleEnd(
   ctx: Ctx,
 ): Effect[] {
   return endGame(draft, ctx, 'hostEnded');
+}
+
+/**
+ * Host taps "Play again" on Game Over (G-52): the same group goes back to a fresh lobby. Not after
+ * an 'updated' end: that game was replaced by an empty one, with no players to bring along (it has
+ * no host either, so the host-only rule already stops it — this check keeps the reason explicit).
+ */
+export function handlePlayAgain(
+  draft: GameState,
+  _msg: EngineMessageOf<'playAgain'>,
+  sender: PlayerSender,
+): Effect[] {
+  if (draft.endReason === 'updated') return [errorTo(sender.connId, 'NOT_ALLOWED', 'playAgain')];
+  return reopenLobby(draft);
 }
 
 /** Round-end deadline (endsAt + ANSWER_GRACE_MS): close the round, compute results once. */

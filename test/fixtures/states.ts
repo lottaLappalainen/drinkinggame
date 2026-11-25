@@ -74,6 +74,7 @@ export function questionState(): GameState {
     .filter((q) => !hasSubject(q.text)) // a regular question: no subject in this fixture
     .slice(0, state.settings.gameLength)
     .map((q) => ({ ...q }));
+  state.playedQuestionIds = state.questions.slice(0, 1).map((q) => q.id); // round 1 is asked
   state.round = {
     roundId: 1,
     index: 0,

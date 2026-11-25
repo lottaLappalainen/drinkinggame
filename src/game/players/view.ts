@@ -1,6 +1,12 @@
 // What phones may see of the game: public players, the public round and the per-viewer snapshot.
 // Never answers, tokens or token hashes (CLAUDE.md §5); results only as computed (S-6).
-import type { PlayerId, PublicPlayer, PublicRound, Snapshot } from '../../shared/protocol';
+import type {
+  PlayerId,
+  PublicPlayer,
+  PublicRound,
+  Snapshot,
+  SnapshotOf,
+} from '../../shared/protocol';
 import { keysOf } from '../ids';
 import type { GameState, PlayerState, RoundState } from '../stateSchema';
 import { pendingReclaims } from './reclaims';
@@ -52,19 +58,11 @@ export function publicRound(state: GameState, round: RoundState): PublicRound {
  * waiting screen (G-38).
  */
 export function buildSnapshot(state: GameState, viewer: PlayerId): Snapshot {
-  const common = {
-    key: state.key,
-    gameId: state.gameId,
-    hostId: state.hostId,
-    settings: { ...state.settings, categories: [...state.settings.categories] },
-    players: publicPlayers(state),
-    you: { playerId: viewer },
-    reclaims: viewer === state.hostId ? pendingReclaims(state) : [],
-  };
+  const common = snapshotCommon(state, viewer);
   const { round } = state;
   switch (state.phase) {
     case 'LOBBY':
-      return { ...common, phase: 'LOBBY' };
+      return lobbySnapshot(state, viewer);
     case 'QUESTION':
       if (round === null) throw new Error('QUESTION without a round');
       return {
@@ -88,4 +86,22 @@ export function buildSnapshot(state: GameState, viewer: PlayerId): Snapshot {
       if (state.endReason === null) throw new Error('ENDED without an endReason');
       return { ...common, phase: 'ENDED', endReason: state.endReason, summary: null };
   }
+}
+
+/** What every phase's snapshot shares. */
+function snapshotCommon(state: GameState, viewer: PlayerId) {
+  return {
+    key: state.key,
+    gameId: state.gameId,
+    hostId: state.hostId,
+    settings: { ...state.settings, categories: [...state.settings.categories] },
+    players: publicPlayers(state),
+    you: { playerId: viewer },
+    reclaims: viewer === state.hostId ? pendingReclaims(state) : [],
+  };
+}
+
+/** The lobby as `viewer` sees it: in `welcome`, and in `newGame` after "Play again" (G-52). */
+export function lobbySnapshot(state: GameState, viewer: PlayerId): SnapshotOf<'LOBBY'> {
+  return { ...snapshotCommon(state, viewer), phase: 'LOBBY' };
 }

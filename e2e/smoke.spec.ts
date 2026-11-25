@@ -93,6 +93,26 @@ test('three phones play a whole round', async ({ page: host, browser }, testInfo
   await expect(host.getByText(/^From most( likely)? to least( likely)?$/)).toBeVisible();
   const ranking = host.getByRole('list', { name: 'The full ranking' });
   await expect(ranking.getByRole('listitem').first()).toContainText('1st');
+
+  // The host ends the game → Game Over everywhere → Play again takes everyone to a new lobby (G-52).
+  await host.getByRole('button', { name: 'Game menu' }).first().click();
+  await host
+    .getByRole('dialog', { name: 'Game menu' })
+    .getByRole('button', { name: 'End game' })
+    .click();
+  await host
+    .getByRole('dialog', { name: 'End the game for everyone?' })
+    .getByRole('button', { name: 'End game' })
+    .click();
+  for (const phone of [host, aino, ville])
+    await expect(phone.getByRole('heading', { name: 'Thanks for playing!' })).toBeVisible();
+  await expect(aino.getByText('The host can start a new game with everyone.')).toBeVisible();
+  await expect(aino.getByRole('button', { name: 'Play again' })).toHaveCount(0); // host only
+  await host.getByRole('button', { name: 'Play again' }).click();
+  for (const phone of [host, aino, ville])
+    await expect(phone.getByRole('heading', { name: '3 players' })).toBeVisible();
+  await expect(host.getByRole('button', { name: 'Start game' })).toBeEnabled();
+  await expect(aino.getByText('Waiting for the host to start…')).toBeVisible();
 });
 
 test('the screen gallery renders every fixture without errors', async ({ page }) => {

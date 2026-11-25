@@ -15,6 +15,7 @@ export type Actions = {
   submit: (ranking: readonly PlayerId[]) => boolean;
   advance: () => boolean;
   endGame: () => boolean;
+  playAgain: () => boolean;
   leave: () => void;
   removePlayer: (playerId: PlayerId) => boolean;
   answerReclaim: (requestId: RequestId, approve: boolean) => boolean;
@@ -40,6 +41,7 @@ export const FROZEN_ACTIONS: Actions = {
   submit: noop,
   advance: noop,
   endGame: noop,
+  playAgain: noop,
   leave: () => undefined,
   removePlayer: noop,
   answerReclaim: noop,

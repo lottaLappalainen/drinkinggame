@@ -71,6 +71,7 @@ export const MESSAGE_RULES: { readonly [T in EngineClientMessage['type']]: Messa
   submit: { sender: 'player', phases: ['QUESTION'], roundBound: true },
   advance: { sender: 'player', hostOnly: true, phases: ['RESULTS'], roundBound: true },
   end: { sender: 'player', hostOnly: true, phases: NOT_ENDED },
+  playAgain: { sender: 'player', hostOnly: true, phases: ['ENDED'] },
   leave: { sender: 'player', phases: ALL },
   removePlayer: { sender: 'player', hostOnly: true, phases: NOT_ENDED },
   answerReclaim: { sender: 'player', hostOnly: true, phases: NOT_ENDED },
@@ -193,6 +194,8 @@ function routeMessage(
       return rounds.handleAdvance(draft, msg, player(), ctx);
     case 'end':
       return rounds.handleEnd(draft, msg, player(), ctx);
+    case 'playAgain':
+      return rounds.handlePlayAgain(draft, msg, player());
     default:
       return assertNever(msg);
   }

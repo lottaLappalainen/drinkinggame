@@ -16,6 +16,7 @@ import type {
 import { questionParts } from '../../shared/questionSubject';
 import { readyCounter } from '../../shared/ready';
 import { STRINGS } from '../strings';
+import { Confetti } from './Confetti';
 import { cx } from './cx';
 import { Badge } from './Feedback';
 import styles from './Game.module.css';
@@ -282,6 +283,16 @@ export function RevealStep(props: {
   /** The viewer is in this step: "You drink 5 sips". */
   you?: boolean;
 }) {
+  return (
+    <>
+      {/* Outside the card: the card's entrance transform would trap a fixed layer inside it. */}
+      {props.top === true && <Confetti />}
+      <RevealCard {...props} />
+    </>
+  );
+}
+
+function RevealCard(props: Parameters<typeof RevealStep>[0]) {
   return (
     <section class={cx(styles.reveal, props.top === true && styles.revealTop)} aria-live="polite">
       <p class={styles.revealLabel}>{props.label}</p>

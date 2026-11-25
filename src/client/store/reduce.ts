@@ -95,6 +95,10 @@ export function applyDelta(snapshot: Snapshot, message: ServerMessage): Snapshot
       };
       return next;
     }
+    // "Play again" (G-52): the whole game starts over, so the lobby replaces everything (like a
+    // welcome, but on the same connection).
+    case 'newGame':
+      return message.snapshot;
     // Not snapshot changes: handled by the store (or the connection, for timeSync).
     case 'welcome':
     case 'leftGame':

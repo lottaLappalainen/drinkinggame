@@ -247,12 +247,15 @@ const SNAPSHOT_COMMON = {
  * Per-viewer: `you` and (host only) `reclaims` differ between phones.
  * A variant on `phase`, so every phase carries exactly the fields it can have.
  */
+/** A lobby (also what "Play again" opens — `newGame`, G-52). */
+export const LobbySnapshotSchema = v.strictObject({
+  ...SNAPSHOT_COMMON,
+  phase: v.literal('LOBBY'),
+  you: YouSchema,
+});
+
 export const SnapshotSchema = v.variant('phase', [
-  v.strictObject({
-    ...SNAPSHOT_COMMON,
-    phase: v.literal('LOBBY'),
-    you: YouSchema,
-  }),
+  LobbySnapshotSchema,
   v.strictObject({
     ...SNAPSHOT_COMMON,
     phase: v.literal('QUESTION'),
@@ -364,6 +367,8 @@ export const ClientMessageSchema = v.variant('type', [
   }),
   v.strictObject({ type: v.literal('advance'), roundId: RoundIdSchema }),
   v.strictObject({ type: v.literal('end') }),
+  /** Host, Game Over only: the same group plays another game (G-52). */
+  v.strictObject({ type: v.literal('playAgain') }),
   v.strictObject({ type: v.literal('leave') }),
   v.strictObject({ type: v.literal('removePlayer'), playerId: PlayerIdSchema }),
   ReclaimMessageSchema,
@@ -385,6 +390,7 @@ export const CLIENT_MESSAGE_TYPES = [
   'submit',
   'advance',
   'end',
+  'playAgain',
   'leave',
   'removePlayer',
   'reclaim',
@@ -471,6 +477,11 @@ export const ServerMessageSchema = v.variant('type', [
     /** Reserved for the Game Over summary (GAME_DESCRIPTION §5.4, U3) — null until decided. */
     summary: v.null(),
   }),
+  /**
+   * The host tapped "Play again" (G-52): the same game is a fresh lobby again — same key, host,
+   * players and settings. Per viewer (like `welcome`), to every online active player.
+   */
+  v.strictObject({ type: v.literal('newGame'), snapshot: LobbySnapshotSchema }),
   v.strictObject({ type: v.literal('timeSync'), t0: v.number(), serverTime: TimestampSchema }),
   ErrorMessageSchema,
 ]);

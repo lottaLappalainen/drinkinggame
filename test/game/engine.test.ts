@@ -175,7 +175,7 @@ describe('the engine never mutates its input', () => {
 });
 
 describe('MESSAGE_RULES', () => {
-  it('host-only actions are exactly the host controls (G-20, G-21, G-43, G-44, G-45, G-46)', () => {
+  it('host-only actions are exactly the host controls (G-20, G-21, G-43, G-44, G-45, G-46, G-52)', () => {
     const hostOnly = Object.entries(MESSAGE_RULES)
       .filter(([, rule]) => 'hostOnly' in rule && rule.hostOnly)
       .map(([type]) => type)
@@ -184,6 +184,7 @@ describe('MESSAGE_RULES', () => {
       'advance',
       'answerReclaim',
       'end',
+      'playAgain',
       'removePlayer',
       'setSettings',
       'start',

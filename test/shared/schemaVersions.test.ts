@@ -17,12 +17,14 @@ const STATE_FINGERPRINTS: Readonly<Record<number, string>> = {
   1: 'aef42d30d8028781', // contracts before any game ran anywhere (only the echo page was deployed); categories, previousTokenHashes, MAX_CANDIDATES 6 and position-named reveal kinds added without a bump
   2: '12074aa158aefd16', // 2026-11-24: game modes (settings.mode, round.spots), add-on categories default/spicy/luuppi, results places only (noVotes, no stats). The engine had been on staging since 2026-11-23, so every shape change needs a real bump from here on
   3: 'de16f388e08116af', // 2026-11-24: drinking rules (reveal step rule filled), "[player]" questions (round.subjectId, player timesSubject), stats sipsDrunk / sipsGiven
+  4: '4b39a6ad706f925c', // 2026-11-25: "Play again" (G-52): playedQuestionIds, so a new game in the same game object avoids repeats
 };
 
 const PROTOCOL_FINGERPRINTS: Readonly<Record<number, string>> = {
   1: '1ac544e07e9f68bb', // contracts before any phone ran a game (only the echo page was deployed); setSettings, join object, leftGame, question categories, MAX_CANDIDATES 6, reveal kinds bottom/third/second/top added without a bump
   2: '16049a3c5965545a', // 2026-11-24: settings.mode + add-on categories, round.spots, candidates/ranking up to MAX_PLAYERS, results noVotes instead of stats, no questionCounts; then (same day, version 2 still deployed nowhere) error codes NOT_ENOUGH_PLAYERS / PAUSED / TOO_EARLY, no waitingForNextRound
   3: '4d3bceb1eec2b0f0', // 2026-11-24: reveal steps carry their drinking rule {action, sips}; the public round carries subjectId for "[player]" questions
+  4: '49475f2f4e356948', // 2026-11-25: "Play again" (G-52): client playAgain (host, Game Over), server newGame {snapshot: lobby}; 'playAgain' allowed in error.for
 };
 
 /** A stable description of a Valibot schema's structure (kinds, keys, literals, checks). */

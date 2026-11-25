@@ -34,6 +34,7 @@ export const PENDING_REQUESTS = [
   'setSettings',
   'leave',
   'end',
+  'playAgain',
   'removePlayer',
   'answerReclaim',
 ] as const satisfies readonly ClientMessageType[];

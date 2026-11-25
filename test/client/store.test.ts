@@ -410,3 +410,35 @@ describe("the host's tools stay disabled until answered (no double taps)", () =>
     expect(app.store.pending.value.has('answerReclaim')).toBe(false);
   });
 });
+
+describe('play again (G-52)', () => {
+  it('the host taps Play again: sent once, pending until the new lobby arrives, which replaces the snapshot', () => {
+    const app = testApp();
+    app.store.joinGame(GAME_KEY, PROFILE);
+    app.socket.open();
+    app.socket.receive(welcome(fixture('ended-finished'))); // Mikko hosts the finished game
+    expect(app.store.playAgain()).toBe(true);
+    expect(app.socket.gameMessages().at(-1)).toEqual({ type: 'playAgain' });
+    expect(app.store.pending.value.has('playAgain')).toBe(true);
+
+    const lobby = fixture('lobby-host');
+    if (lobby.phase !== 'LOBBY') throw new Error('fixture');
+    app.socket.receive({ type: 'newGame', snapshot: lobby });
+    expect(app.store.snapshot.value).toEqual(lobby);
+    expect(app.store.pending.value.size).toBe(0);
+    // Still the same game and login: nothing to reconnect, no exit screen.
+    expect(app.store.gameKey.value).toBe(GAME_KEY);
+    expect(app.store.exit.value).toBeNull();
+  });
+
+  it('a refusal re-enables the button and says why', () => {
+    const app = testApp();
+    app.store.joinGame(GAME_KEY, PROFILE);
+    app.socket.open();
+    app.socket.receive(welcome(fixture('ended-finished')));
+    app.store.playAgain();
+    app.socket.receive({ type: 'error', code: 'NOT_ALLOWED', for: 'playAgain' });
+    expect(app.store.pending.value.has('playAgain')).toBe(false);
+    expect(app.store.notice.value).toEqual({ code: 'NOT_ALLOWED', for: 'playAgain' });
+  });
+});

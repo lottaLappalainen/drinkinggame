@@ -171,6 +171,7 @@ function Game(props: { gameKey: GameKey; profile: Profile; onEditProfile: () => 
         submit: store.submit,
         advance: store.advance,
         endGame: store.endGame,
+        playAgain: store.playAgain,
         leave: store.leave,
         removePlayer: store.removePlayer,
         answerReclaim: store.answerReclaim,
@@ -261,7 +262,13 @@ export function PhaseScreen(props: {
     case 'RESULTS':
       return <ResultsScreen snapshot={snapshot} />;
     case 'ENDED':
-      return <EndedScreen reason={snapshot.endReason} onHome={props.onHome} />;
+      return (
+        <EndedScreen
+          reason={snapshot.endReason}
+          isHost={snapshot.hostId === snapshot.you.playerId}
+          onHome={props.onHome}
+        />
+      );
     default: {
       const unknown: never = snapshot;
       return unknown;

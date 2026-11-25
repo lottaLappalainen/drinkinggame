@@ -96,9 +96,57 @@ describe('drawQuestions (G-22, G-31)', () => {
       category: i < 3 ? 'default' : 'spicy',
       labels: 'likely',
     }));
-    expect(drawQuestions([], 3, seeded(1), bank)).toHaveLength(3);
-    expect(drawQuestions([], 4, seeded(1), bank)).toBeNull(); // Default alone: 3
-    expect(drawQuestions(['spicy'], 5, seeded(1), bank)).toHaveLength(5);
-    expect(drawQuestions(['luuppi'], 4, seeded(1), bank)).toBeNull();
+    expect(drawQuestions([], 3, seeded(1), { bank })).toHaveLength(3);
+    expect(drawQuestions([], 4, seeded(1), { bank })).toBeNull(); // Default alone: 3
+    expect(drawQuestions(['spicy'], 5, seeded(1), { bank })).toHaveLength(5);
+    expect(drawQuestions(['luuppi'], 4, seeded(1), { bank })).toBeNull();
+  });
+});
+
+describe('play again (G-52): questions the group has not had come first', () => {
+  const bank: Question[] = Array.from({ length: 10 }, (_, i) => ({
+    id: `y${String(i)}`,
+    text: `Who is most likely to ${String(i)}?`,
+    category: 'default',
+    labels: 'likely',
+  }));
+  const ids = (questions: Question[] | null) => (questions ?? []).map((q) => q.id);
+
+  it('draws only unplayed questions while there are enough of them', () => {
+    const played = ['y0', 'y1', 'y2', 'y3', 'y4', 'y5'];
+    for (let seed = 1; seed <= 50; seed++)
+      expect(ids(drawQuestions([], 4, seeded(seed), { bank, played })).sort()).toEqual([
+        'y6',
+        'y7',
+        'y8',
+        'y9',
+      ]);
+  });
+
+  it('tops up with played ones when the unplayed run out: every unplayed one in, no repeats', () => {
+    const played = ['y0', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6'];
+    for (let seed = 1; seed <= 50; seed++) {
+      const drawn = ids(drawQuestions([], 6, seeded(seed), { bank, played }));
+      expect(new Set(drawn).size).toBe(6);
+      for (const id of ['y7', 'y8', 'y9']) expect(drawn).toContain(id);
+    }
+  });
+
+  it('the top-up is mixed in, not always at the end of the game', () => {
+    const played = ['y0', 'y1', 'y2', 'y3', 'y4', 'y5', 'y6'];
+    const lastIsFresh = Array.from({ length: 40 }, (_, seed) =>
+      ['y7', 'y8', 'y9'].includes(
+        ids(drawQuestions([], 6, seeded(seed + 1), { bank, played }))[5] ?? '',
+      ),
+    );
+    expect(lastIsFresh).toContain(true);
+    expect(lastIsFresh).toContain(false);
+  });
+
+  it('with no history the draw is exactly what it was before play again existed', () => {
+    for (let seed = 1; seed <= 20; seed++)
+      expect(drawQuestions([], 5, seeded(seed), { bank, played: [] })).toEqual(
+        drawQuestions([], 5, seeded(seed), { bank }),
+      );
   });
 });

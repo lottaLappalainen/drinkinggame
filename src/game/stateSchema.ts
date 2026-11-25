@@ -129,6 +129,12 @@ export const GameStateSchema = v.strictObject({
    * removing questions and deploying mid-party is safe. (~5 KB for 35 questions.)
    */
   questions: v.array(QuestionSchema),
+  /**
+   * Ids of every question this group has been dealt in this game object, across "Play again"
+   * (G-52): a new game draws questions not played yet first, so the same group doesn't get
+   * repeats until the pool runs out.
+   */
+  playedQuestionIds: v.array(QuestionSchema.entries.id),
   round: v.nullable(RoundStateSchema),
   /** When the last identified player's socket closed; null while any player is online. */
   idleSince: v.nullable(TimestampSchema),
@@ -170,8 +176,13 @@ export function createPlayer(input: NewPlayerInput): PlayerState {
     timesShown: 0,
     timesSubject: 0,
     status: 'active',
-    stats: { timesFirst: 0, timesLast: 0, answered: 0, missed: 0, sipsDrunk: 0, sipsGiven: 0 },
+    stats: freshStats(),
   };
+}
+
+/** A player's per-game counters at the start of a game (a new player, or "Play again", G-52). */
+export function freshStats(): PlayerState['stats'] {
+  return { timesFirst: 0, timesLast: 0, answered: 0, missed: 0, sipsDrunk: 0, sipsGiven: 0 };
 }
 
 export type CreateGameInput = {
@@ -196,6 +207,7 @@ export function createGame(input: CreateGameInput): GameState {
     connections: {},
     reclaims: {},
     questions: [],
+    playedQuestionIds: [],
     round: null,
     // Nobody connected yet: the lobby idles until the host's phone connects.
     idleSince: input.host.now,
@@ -226,6 +238,7 @@ export function createUpdatedEndState(input: {
     connections: {},
     reclaims: {},
     questions: [],
+    playedQuestionIds: [],
     round: null,
     idleSince: null,
     deadlines: { retention: input.now + ENDED_RETENTION_MS },

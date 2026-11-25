@@ -4,9 +4,9 @@
 
 // ── Versions ────────────────────────────────────────────────────────────────
 /** Bump on any change to the saved GameState shape (CLAUDE.md §4 "State version + schema"). */
-export const STATE_VERSION = 3;
+export const STATE_VERSION = 4;
 /** Bump on any incompatible wire-protocol change (CLAUDE.md §4 "Deploys and protocol changes"). */
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 // ── Players ─────────────────────────────────────────────────────────────────
 export const MAX_PLAYERS = 25; // active players per game (G-13)

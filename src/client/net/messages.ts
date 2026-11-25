@@ -25,6 +25,7 @@ const SERVER_MESSAGE_TYPES = {
   reclaimClosed: true,
   reclaimResult: true,
   gameEnded: true,
+  newGame: true,
   timeSync: true,
   error: true,
 } as const satisfies Record<ServerMessageType, true>;

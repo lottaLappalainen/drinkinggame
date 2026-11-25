@@ -319,6 +319,7 @@ export function createStore(deps: StoreDeps) {
         setPending('answerReclaim', false); // the server closes a request on every answer
         return;
       case 'gameEnded':
+      case 'newGame': // a new phase: whatever was in flight belongs to the old one
         pending.value = new Set();
         return;
       default:
@@ -506,6 +507,10 @@ export function createStore(deps: StoreDeps) {
     },
     endGame: (): boolean => {
       return send({ type: 'end' }, 'end');
+    },
+    /** Game Over: the host takes the same group back to a fresh lobby (G-52). */
+    playAgain: (): boolean => {
+      return send({ type: 'playAgain' }, 'playAgain');
     },
     removePlayer: (playerId: PlayerId): boolean => {
       return send({ type: 'removePlayer', playerId }, 'removePlayer');
