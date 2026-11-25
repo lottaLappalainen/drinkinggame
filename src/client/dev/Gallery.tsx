@@ -252,14 +252,19 @@ function Components() {
           ))}
         </Row>
       </Section>
-      <Section title="Podium tray (3rd and 2nd stay on screen during the reveal; a tie shares a card)">
+      <Section title="Podium tray: silver left, bronze right (only bronze so far / both, a tie shares a card / only one slot, centred)">
         <PodiumTray
           label="Revealed so far"
-          entries={[
-            { place: 3, players: SIX.slice(3, 4) },
+          slots={[null, { place: 3, players: SIX.slice(3, 4) }]}
+        />
+        <PodiumTray
+          label="Revealed so far"
+          slots={[
             { place: 2, players: SIX.slice(1, 3) },
+            { place: 3, players: SIX.slice(3, 4) },
           ]}
         />
+        <PodiumTray label="Revealed so far" slots={[{ place: 2, players: SIX.slice(1, 2) }]} />
       </Section>
       <Section title="Reveal (with the drinking rule a beat after the names)">
         <RevealStep

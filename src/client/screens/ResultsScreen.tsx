@@ -131,14 +131,18 @@ function Ranked(props: {
       : position.kind === 'drumroll'
         ? position.afterStep
         : -1;
-  const podium = results.steps
-    .slice(0, revealedUpTo + 1)
-    .filter((step) => step.kind === 'third' || step.kind === 'second')
-    .map((step) => ({ place: step.place, players: players(step.playerIds) }));
+  // The tray's halves: silver left, bronze right — only the ones this reveal has (a tie or 3
+  // players can leave one out); each stays empty (null) until its step is over.
+  const podium = (['second', 'third'] as const).flatMap((kind) => {
+    const index = results.steps.findIndex((step) => step.kind === kind);
+    const step = results.steps[index];
+    if (step === undefined) return [];
+    return [index <= revealedUpTo ? { place: step.place, players: players(step.playerIds) } : null];
+  });
   const withTray = (main: ComponentChildren) => (
     <Stack grow gap="5">
       <Center grow>{main}</Center>
-      <PodiumTray entries={podium} source={source} label={STRINGS.results.podiumSoFar} />
+      <PodiumTray slots={podium} source={source} label={STRINGS.results.podiumSoFar} />
     </Stack>
   );
 

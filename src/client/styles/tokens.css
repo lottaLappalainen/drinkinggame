@@ -150,9 +150,9 @@
   --dur-confetti: 2800ms;
 
   /* The reveal podium (ui/Podium) and the full ranking entrance (PlayerList entrance) */
-  --podium-card-width: 6.5rem;
   --podium-card-height: 7.5rem; /* reserved below the big card, so it never jumps */
-  --podium-fly-x: -30vw; /* a tray card starts in the middle of the screen... */
+  --podium-fly-x-to-left-half: 25vw; /* a tray card starts in the middle of the screen, a quarter */
+  --podium-fly-x-to-right-half: -25vw; /* of the width away from either half... */
   --podium-fly-y: -30vh;
   --podium-fly-scale: 1.8; /* ...and big, like the card it replaces */
   --dur-podium-fly: 600ms;

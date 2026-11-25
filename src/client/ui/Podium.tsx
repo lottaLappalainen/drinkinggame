@@ -1,9 +1,11 @@
-// The podium tray of the reveal (G-50): once 3rd and 2nd place have had their big moment, they
-// shrink into small cards at the bottom right and stay there (bronze in the corner, silver next to
-// it) while the rest of the reveal plays. Each card flies in from the middle of the screen, where
-// its big card just was. Mounted once per reveal and keyed by place, so a card that is already
-// there never replays its entrance.
+// The podium tray of the reveal (G-50): once 2nd and 3rd place have had their big moment, they stay
+// on screen under the big card, side by side in two equal halves: silver on the left, bronze on the
+// right (user 2026-11-25). Each half is reserved from the start, so a card lands in its own place
+// and never pushes the other; a reveal with only one of them (e.g. 3 players: no separate 3rd
+// step) shows that card centred at half width. Each card flies in from the middle of the screen,
+// where its big card just was. Keyed by slot, so a card already there never replays its entrance.
 import type { PublicPlayer } from '../../shared/protocol';
+import { cx } from './cx';
 import { Avatar, photoUrl, type PhotoSource } from './Game';
 import { PlaceNumber } from './PlaceNumber';
 import styles from './Podium.module.css';
@@ -11,35 +13,48 @@ import styles from './Podium.module.css';
 export type PodiumEntry = { readonly place: number; readonly players: readonly PublicPlayer[] };
 
 export function PodiumTray(props: {
-  /** Revealed podium places so far (any order); shown best place first, so bronze ends up last. */
-  entries: readonly PodiumEntry[];
+  /**
+   * The podium slots this reveal has, left to right (silver, then bronze); `null` = not revealed
+   * yet (its half stays empty). One slot = shown centred.
+   */
+  slots: readonly (PodiumEntry | null)[];
   source?: PhotoSource | undefined;
   /** Accessible name of the tray (e.g. "Revealed so far"). */
   label: string;
 }) {
-  const entries = [...props.entries].sort((a, b) => a.place - b.place);
+  const single = props.slots.length === 1;
   return (
-    <ul class={styles.tray} aria-label={props.label}>
-      {entries.map((entry) => (
-        <li key={entry.place} class={styles.card}>
-          <PlaceNumber place={entry.place} />
-          <span class={styles.avatars}>
-            {entry.players.map((player) => (
-              <Avatar
-                key={player.playerId}
-                presetId={player.avatar.presetId}
-                photo={
-                  props.source !== undefined && player.avatar.photoVersion !== null
-                    ? photoUrl(props.source, player.playerId, player.avatar.photoVersion)
-                    : null
-                }
-                size="sm"
-              />
-            ))}
-          </span>
-          <span class={styles.names}>{entry.players.map((p) => p.nickname).join(', ')}</span>
-        </li>
-      ))}
+    <ul class={cx(styles.tray, single && styles.single)} aria-label={props.label}>
+      {props.slots.map((entry, index) =>
+        entry === null ? (
+          <li key={index} class={styles.empty} aria-hidden="true" />
+        ) : (
+          <li
+            key={index}
+            class={cx(
+              styles.card,
+              single ? styles.fromAbove : index === 0 ? styles.fromRight : styles.fromLeft,
+            )}
+          >
+            <PlaceNumber place={entry.place} />
+            <span class={styles.avatars}>
+              {entry.players.map((player) => (
+                <Avatar
+                  key={player.playerId}
+                  presetId={player.avatar.presetId}
+                  photo={
+                    props.source !== undefined && player.avatar.photoVersion !== null
+                      ? photoUrl(props.source, player.playerId, player.avatar.photoVersion)
+                      : null
+                  }
+                  size="sm"
+                />
+              ))}
+            </span>
+            <span class={styles.names}>{entry.players.map((p) => p.nickname).join(', ')}</span>
+          </li>
+        ),
+      )}
     </ul>
   );
 }

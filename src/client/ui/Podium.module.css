@@ -1,14 +1,20 @@
-/* The podium tray: small cards in the bottom-right corner of the reveal, each flying in from the
-   middle of the screen. Transform / opacity only. */
+/* The podium tray: two equal halves under the big card (silver left, bronze right), each card
+   flying in from the middle of the screen. Transform / opacity only. */
 .tray {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
   min-height: var(--podium-card-height);
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Only one podium slot in this reveal: centred, at the width of one half. */
+.single {
+  grid-template-columns: minmax(0, 1fr);
+  width: calc((100% - var(--space-3)) / 2);
+  margin-inline: auto;
 }
 
 .card {
@@ -16,13 +22,30 @@
   flex-direction: column;
   align-items: center;
   gap: var(--space-1);
-  width: var(--podium-card-width);
+  min-width: 0;
   padding: var(--space-2);
   border-radius: var(--card-radius);
   background: var(--color-surface);
   color: var(--color-on-surface);
   box-shadow: var(--shadow-1);
   animation: podium-fly-in var(--dur-podium-fly) var(--ease-out) both;
+}
+
+/* Where a card starts: the middle of the screen is to the right of the left half, and so on. */
+.fromRight {
+  --podium-fly-x: var(--podium-fly-x-to-left-half);
+}
+
+.fromLeft {
+  --podium-fly-x: var(--podium-fly-x-to-right-half);
+}
+
+.fromAbove {
+  --podium-fly-x: 0;
+}
+
+.empty {
+  min-width: 0;
 }
 
 .avatars {
