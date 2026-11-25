@@ -23,6 +23,10 @@ describe('storage', () => {
       gameId: GAME_ID,
     });
     expect(storage.savedGameKeys()).toEqual([GAME_KEY]);
+    // An ended game keeps its login but isn't offered on Home any more.
+    storage.saveGame(GAME_KEY, { token: 'tokenAAAAAAAAAAAAAAAAA', gameId: GAME_ID, ended: true });
+    expect(storage.loadGame(GAME_KEY)?.ended).toBe(true);
+    expect(storage.savedGameKeys()).toEqual([]);
     storage.forgetGame(GAME_KEY);
     expect(storage.loadGame(GAME_KEY)).toBeNull();
 

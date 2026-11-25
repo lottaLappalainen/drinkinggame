@@ -393,6 +393,25 @@ describe('Home', () => {
     app.timers.advance(60_000);
     expect(app.sockets).toHaveLength(1);
   });
+
+  it('a game that has ended is no longer offered as "Return to game" (the login is kept for refresh)', () => {
+    const app = joined();
+    app.socket.receive({ type: 'gameEnded', reason: 'hostEnded', summary: null });
+    app.store.goHome();
+    expect(app.storage.savedGameKeys()).toEqual([]);
+    expect(app.storage.loadGame(GAME_KEY)?.ended).toBe(true); // a refresh still shows Game Over
+  });
+
+  it('joining (or refreshing) into an ENDED game hides it too; "Play again" offers it again', () => {
+    const app = joined();
+    const lobby = app.store.snapshot.value;
+    if (lobby?.phase !== 'LOBBY') throw new Error('expected the lobby');
+    app.socket.receive(welcome({ ...lobby, phase: 'ENDED', endReason: 'finished', summary: null }));
+    expect(app.storage.savedGameKeys()).toEqual([]);
+    app.socket.receive({ type: 'newGame', snapshot: lobby });
+    expect(app.storage.savedGameKeys()).toEqual([GAME_KEY]);
+    expect(app.storage.loadGame(GAME_KEY)?.ended).toBeUndefined();
+  });
 });
 
 describe("the host's tools stay disabled until answered (no double taps)", () => {

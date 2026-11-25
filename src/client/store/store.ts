@@ -211,7 +211,11 @@ export function createStore(deps: StoreDeps) {
     if (key === null || entry === null) return;
     welcomed = true;
     conn.resetBackoff();
-    entry = { token: entry.token, gameId: message.gameId };
+    entry = {
+      token: entry.token,
+      gameId: message.gameId,
+      ...(message.snapshot.phase === 'ENDED' && { ended: true as const }),
+    };
     storage.saveGame(key, entry);
     pendingJoin = null;
     batch(() => {
@@ -297,6 +301,17 @@ export function createStore(deps: StoreDeps) {
       snapshot.value = applyDelta(current, message);
       settlePending(message, current.you.playerId);
     });
+    if (message.type === 'gameEnded' || message.type === 'newGame')
+      markEnded(message.type === 'gameEnded');
+  };
+
+  /** Remember on the phone whether this game is over, so Home stops offering it (G-17, G-48). */
+  const markEnded = (ended: boolean) => {
+    const key = gameKey.value;
+    if (key === null || entry === null || (entry.ended === true) === ended) return;
+    const { ended: _was, ...rest } = entry;
+    entry = ended ? { ...rest, ended: true } : rest;
+    storage.saveGame(key, entry);
   };
 
   /** The answer to a request arrived as a broadcast: enable its button again. */

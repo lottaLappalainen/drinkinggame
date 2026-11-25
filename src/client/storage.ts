@@ -21,6 +21,12 @@ export type GameEntry = {
   readonly token: string;
   /** The game this phone last saw under the key — absent until the first `welcome`. */
   readonly gameId?: GameId;
+  /**
+   * The game is over (Game Over screen). The login is kept, so a refresh still shows Game Over
+   * during the retention window (G-48), but Home no longer offers "Return to game" for it.
+   * Cleared again if the host taps "Play again" (G-52).
+   */
+  readonly ended?: true;
 };
 
 export type Profile = { readonly nickname: string; readonly presetId: PresetId };
@@ -78,11 +84,13 @@ export function createStorage(
   };
   const asEntry = (value: unknown): GameEntry | null => {
     if (typeof value !== 'object' || value === null) return null;
-    const { token, gameId } = value as Record<string, unknown>;
+    const { token, gameId, ended } = value as Record<string, unknown>;
     if (typeof token !== 'string' || !TOKEN_PATTERN.test(token)) return null;
-    if (typeof gameId === 'string' && ID_PATTERN.test(gameId))
-      return { token, gameId: gameId as GameId };
-    return { token };
+    return {
+      token,
+      ...(typeof gameId === 'string' && ID_PATTERN.test(gameId) && { gameId: gameId as GameId }),
+      ...(ended === true && { ended: true as const }),
+    };
   };
 
   return {
@@ -97,15 +105,16 @@ export function createStorage(
     forgetGame(key: GameKey): void {
       remove(local, GAME_PREFIX + key);
     },
-    /** Every game this phone has a login for (Home's "Return to game", G-17). */
+    /** Every RUNNING game this phone has a login for (Home's "Return to game", G-17) — not ended ones. */
     savedGameKeys(): GameKey[] {
       const keys: GameKey[] = [];
       try {
         for (let i = 0; i < (local?.length ?? 0); i++) {
           const name = local?.key(i) ?? '';
           const key = name.slice(GAME_PREFIX.length);
-          if (name.startsWith(GAME_PREFIX) && isGameKey(key) && this.loadGame(key) !== null)
-            keys.push(key);
+          if (!name.startsWith(GAME_PREFIX) || !isGameKey(key)) continue;
+          const entry = this.loadGame(key);
+          if (entry !== null && entry.ended !== true) keys.push(key);
         }
       } catch {
         // ignore
