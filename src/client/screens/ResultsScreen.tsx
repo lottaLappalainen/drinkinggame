@@ -1,8 +1,8 @@
 // Screen 5 — Results (G-45, G-50, S-4…S-8). The reveal is driven by the server's timestamps
 // (shared/reveal.ts): every phone shows the same step at the same moment, and a phone that comes
 // back mid-reveal jumps to the current one. Places only — never vote counts (S-6). The words come
-// from the question's label set (Q-8); a partial ranking (Podium) has no "least" and a "No votes"
-// group. The host's Next unlocks exactly at revealEndsAt (never the server's early tolerance).
+// from the question's label set (Q-8); a partial ranking (Podium) has no "least", and the players
+// nobody placed share the last place. The host's Next unlocks exactly at revealEndsAt (never the server's early tolerance).
 // Each step announces its drinking rule a beat after the names (D-6); the full ranking keeps the
 // rules next to the revealed places until Next.
 import type { ComponentChildren } from 'preact';
@@ -15,12 +15,11 @@ import type {
 } from '../../shared/protocol';
 import { MIN_ANSWERS_FOR_RANKING, REVEAL_RULE_DELAY_MS } from '../../shared/constants';
 import { DRINK_RULES } from '../../shared/drinkRules';
-import { NO_VOTES_LABEL, placeLabel, rankingOrderLabel } from '../../shared/questionLabels';
+import { placeLabel, rankingOrderLabel } from '../../shared/questionLabels';
 import { nextRevealChangeAt, revealPosition, revealStepStartsAt } from '../../shared/reveal';
 import { isPartialRanking } from '../../shared/spots';
 import { STRINGS } from '../strings';
 import { Button } from '../ui/Controls';
-import { Card } from '../ui/Feedback';
 import {
   DrinkBadge,
   DrinkChip,
@@ -202,8 +201,9 @@ function Ranked(props: {
 const SETTLED_MS = -60_000;
 
 /**
- * After the reveal: everyone with a place (revealed places keep their drinking rule, D-6), then
- * (Podium) the "No votes" group. If the viewer has a rule, it's repeated on top. Each row starts
+ * After the reveal: everyone with a place (revealed places keep their drinking rule, D-6). In
+ * Podium, players nobody placed simply share the last place at the bottom (user 2026-11-25: no
+ * separate "No votes" group); they never have a rule (D-4). If the viewer has a rule, it's repeated on top. Each row starts
  * with its place number (medals for 1–3, ties share them); a line under the heading says which way
  * the list runs, so the rows need no place words.
  */
@@ -220,14 +220,18 @@ function FullRanking(props: {
   const ranked = results.ranking.flatMap((entry) =>
     props.players([entry.playerId]).map((player) => ({ player, place: entry.place })),
   );
-  const noVotes = results.noVotes === null ? [] : props.players(results.noVotes);
-  // Who has which rule: everyone in a reveal step (middle places and "No votes" have none, D-4).
+  // Nobody placed them: tied for the place after everyone who got points (1, 2, 2, 4 → 5).
+  const lastPlace = ranked.length + 1;
+  const unplaced = (results.noVotes === null ? [] : props.players(results.noVotes)).map(
+    (player) => ({ player, place: lastPlace }),
+  );
+  // Who has which rule: everyone in a reveal step (middle places and the unplaced have none, D-4).
   const rules = new Map<PlayerId, DrinkRule>();
   const myStep = results.steps.find((step) => step.playerIds.includes(props.me));
   for (const step of results.steps)
     if (step.rule !== null) for (const id of step.playerIds) rules.set(id, step.rule);
   // Two blocks, spaced like the screen's own blocks (`Screen` gap = space 5): the viewer's own rule,
-  // then the ranking, whose heading, rows and "No votes" group sit closer together (space 3).
+  // then the ranking, whose heading and rows sit closer together (space 3).
   return (
     <Stack gap="5">
       {myStep?.rule != null && (
@@ -248,7 +252,7 @@ function FullRanking(props: {
         <PlayerList
           label={STRINGS.results.fullRanking}
           entrance
-          items={ranked.map(({ player, place }) => {
+          items={[...ranked, ...unplaced].map(({ player, place }) => {
             const rule = rules.get(player.playerId);
             return {
               key: player.playerId,
@@ -269,24 +273,6 @@ function FullRanking(props: {
             };
           })}
         />
-        {noVotes.length > 0 && (
-          <Card label={NO_VOTES_LABEL}>
-            <Text variant="label">{NO_VOTES_LABEL}</Text>
-            <PlayerList
-              label={NO_VOTES_LABEL}
-              items={noVotes.map((player) => ({
-                key: player.playerId,
-                content: (
-                  <PlayerChip
-                    player={player}
-                    source={props.source}
-                    isYou={player.playerId === props.me}
-                  />
-                ),
-              }))}
-            />
-          </Card>
-        )}
         {results.noVotes === null && <Text variant="small">{STRINGS.results.onlyTop}</Text>}
       </Stack>
     </Stack>

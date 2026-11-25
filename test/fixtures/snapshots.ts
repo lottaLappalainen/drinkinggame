@@ -543,7 +543,8 @@ export const SCREEN_FIXTURES: readonly ScreenFixture[] = [
   },
   {
     name: 'results-podium-done',
-    screen: '5 Podium, reveal done: places for those with votes, then the "No votes" group (G-50)',
+    screen:
+      '5 Podium, reveal done: places for those with votes, the rest share the last place (G-50)',
     now: PODIUM_RANKED.revealEndsAt + 1_000,
     snapshot: podiumResults(PODIUM_RANKED),
   },
