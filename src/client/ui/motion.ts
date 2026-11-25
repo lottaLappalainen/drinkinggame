@@ -23,6 +23,31 @@ function tokenValue(name: string, fallback: string): string {
   }
 }
 
+/**
+ * Where an element sits in the LAYOUT, as a border-box position from the page origin: built from
+ * offsetLeft / offsetTop, which ignore CSS transforms and running animations, and don't change
+ * when a container scrolls. getBoundingClientRect would include them, so a FLIP measured with it
+ * saw "moves" that never happened: a hovered spot's scale (`spotOver`), or the previous FLIP still
+ * running (each re-render then restarted a smaller slide: the drag twitch, 2026-11-25).
+ */
+function layoutPosition(element: HTMLElement): { left: number; top: number } {
+  let left = 0;
+  let top = 0;
+  for (let node: HTMLElement | null = element; node !== null;) {
+    left += node.offsetLeft;
+    top += node.offsetTop;
+    const parent: HTMLElement | null =
+      node.offsetParent instanceof HTMLElement ? node.offsetParent : null;
+    // offsetLeft is measured from the parent's padding edge: add its border to stay border-box.
+    if (parent !== null) {
+      left += parent.clientLeft;
+      top += parent.clientTop;
+    }
+    node = parent;
+  }
+  return { left, top };
+}
+
 /** The ref `useFlip` returns: attach it to the list; `from` overrides where an item comes from. */
 export type FlipRef<T extends HTMLElement> = {
   current: T | null;
@@ -44,10 +69,12 @@ export function useFlip<T extends HTMLElement>(): FlipRef<T> {
     from: (key, viewport) => {
       const list = ref.current.current;
       if (list === null) return;
+      // A viewport point → the list's layout coordinates (as measured below): from the list's
+      // border box, plus how far the list itself is scrolled.
       const origin = list.getBoundingClientRect();
       before.current.set(key, {
-        left: viewport.left - origin.left,
-        top: viewport.top - origin.top,
+        left: viewport.left - origin.left + list.scrollLeft,
+        top: viewport.top - origin.top + list.scrollTop,
       });
     },
   });
@@ -57,13 +84,13 @@ export function useFlip<T extends HTMLElement>(): FlipRef<T> {
     if (list === null || typeof list.animate !== 'function') return;
     const duration = tokenMs('--dur-base');
     const easing = tokenValue('--ease-out', 'ease-out');
-    // Positions RELATIVE TO THE LIST: viewport positions would count scrolling as movement, so a
-    // scrolled list would slide every row on the next update.
-    const origin = list.getBoundingClientRect();
+    // Layout positions RELATIVE TO THE LIST: page scrolling is not movement, and neither are
+    // transforms or animations (see layoutPosition).
+    const origin = layoutPosition(list);
     const now = new Map<string, { left: number; top: number }>();
     for (const element of Array.from(list.querySelectorAll<HTMLElement>('[data-flip]'))) {
       const key = element.dataset.flip ?? '';
-      const box = element.getBoundingClientRect();
+      const box = layoutPosition(element);
       const rect = { left: box.left - origin.left, top: box.top - origin.top };
       now.set(key, rect);
       const old = before.current.get(key);
