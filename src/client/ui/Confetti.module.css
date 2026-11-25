@@ -1,0 +1,58 @@
+/* Confetti behind the "most likely" card: a fixed layer under the page content (z-index below 0),
+   falling once. Each piece gets its position, delay, speed, drift and spin as custom properties. */
+.confetti {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-confetti);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.piece {
+  position: absolute;
+  top: 0;
+  left: calc(var(--x) * 1%);
+  width: var(--confetti-piece-width);
+  height: var(--confetti-piece-height);
+  border-radius: var(--confetti-piece-radius);
+  animation: confetti-fall calc(var(--dur-confetti) * var(--speed)) linear var(--delay) both;
+}
+
+.tone1 {
+  background: var(--color-primary);
+}
+
+.tone2 {
+  background: var(--color-secondary);
+}
+
+.tone3 {
+  background: var(--color-accent);
+}
+
+.tone4 {
+  background: var(--color-indicator-strong);
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate(0, var(--confetti-start)) rotate(0turn);
+  }
+
+  85% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate(calc(var(--drift) * var(--confetti-drift)), var(--confetti-fall))
+      rotate(calc(var(--spin) * 1turn));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti {
+    display: none;
+  }
+}
