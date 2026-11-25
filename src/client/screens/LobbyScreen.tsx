@@ -1,6 +1,7 @@
 // Screen 3 — Lobby (G-5, G-20…G-24, G-41, G-43, G-44): the key, link + QR (the main way to join),
 // the live player list, the settings (host changes them, everyone sees them), Start, Leave, and
 // the host's tools: remove a player offline ≥ 2 min, answer "That's me" requests.
+import { useRef } from 'preact/hooks';
 import { GAME_LENGTHS, MIN_PLAYERS, PODIUM_MIN_PLAYERS } from '../../shared/constants';
 import type { Settings, SnapshotOf } from '../../shared/protocol';
 import { ADD_ON_CATEGORY_IDS, categoryById } from '../../shared/questionCategories';
@@ -28,9 +29,19 @@ export function LobbyScreen(props: {
   const source = photoSource(snapshot);
   const canRemove = useCanRemove(snapshot);
 
-  const settings = snapshot.settings;
-  const change = (patch: Partial<Settings>) => env.actions.setSettings({ ...settings, ...patch });
-  const busy = env.pending.has('setSettings');
+  // While a change is on its way, show what was sent: the tapped control changes at once and
+  // nothing else in the card moves (controls used to be disabled — faded — for the round trip). A
+  // quick second tap builds on the first, since setSettings sends the WHOLE settings object. When
+  // the server answers (settingsChanged) or refuses (an error), the server's settings show again.
+  // A ref, not state: a second tap must see the first one's settings even before a re-render.
+  const sent = useRef<Settings | null>(null);
+  const changing = env.pending.has('setSettings');
+  if (!changing) sent.current = null; // answered or refused: the server's settings count again
+  const settings = sent.current ?? snapshot.settings;
+  const change = (patch: Partial<Settings>) => {
+    const next = { ...(sent.current ?? snapshot.settings), ...patch };
+    if (env.actions.setSettings(next)) sent.current = next;
+  };
   const podiumAllowed = active.length >= PODIUM_MIN_PLAYERS;
   const startBlocked =
     active.length < MIN_PLAYERS
@@ -86,9 +97,11 @@ export function LobbyScreen(props: {
           <SegmentedControl
             label={STRINGS.lobby.length}
             value={settings.gameLength}
-            disabled={!isHost || busy}
+            disabled={!isHost}
             options={GAME_LENGTHS.map((n) => ({ value: n, label: String(n) }))}
-            onChange={(gameLength) => change({ gameLength })}
+            onChange={(gameLength) => {
+              change({ gameLength });
+            }}
           />
         </Stack>
         <Stack gap="1">
@@ -102,14 +115,14 @@ export function LobbyScreen(props: {
                 label={`${category.emoji} ${category.name}`}
                 hint={STRINGS.lobby.categoryHint[id]}
                 checked={on}
-                disabled={!isHost || busy}
-                onChange={(checked) =>
+                disabled={!isHost}
+                onChange={(checked) => {
                   change({
                     categories: checked
                       ? [...settings.categories, id]
                       : settings.categories.filter((c) => c !== id),
-                  })
-                }
+                  });
+                }}
               />
             );
           })}
@@ -119,14 +132,16 @@ export function LobbyScreen(props: {
           <SegmentedControl<GameMode>
             label={STRINGS.lobby.mode}
             value={settings.mode}
-            disabled={!isHost || busy}
+            disabled={!isHost}
             options={GAME_MODES.map((mode) => ({
               value: mode,
               label: STRINGS.lobby.modeNames[mode],
               // Switching TO Podium needs 7+ (G-24); a Podium choice already made stays selectable.
               disabled: mode === 'podium' && !podiumAllowed && settings.mode !== 'podium',
             }))}
-            onChange={(mode) => change({ mode })}
+            onChange={(mode) => {
+              change({ mode });
+            }}
           />
           <Text variant="small">
             {!podiumAllowed && settings.mode !== 'podium'
@@ -159,13 +174,15 @@ export function LobbyScreen(props: {
             {STRINGS.lobby.waitingForHost}
           </Text>
         )}
-        <Row gap="2" justify="between" wrap>
-          <Button variant="ghost" onClick={env.actions.editProfile}>
-            {STRINGS.profile.edit}
-          </Button>
-          <LeaveButton />
-        </Row>
       </Stack>
+      {/* Secondary actions: their own block, a screen gap below the main one (like the game menu
+          under Next / Ready on the other game screens). */}
+      <Row gap="2" justify="between" wrap>
+        <Button variant="ghost" onClick={env.actions.editProfile}>
+          {STRINGS.profile.edit}
+        </Button>
+        <LeaveButton />
+      </Row>
     </Screen>
   );
 }
