@@ -236,6 +236,8 @@ function Game(props: { gameKey: GameKey; profile: Profile; onEditProfile: () => 
       {notice !== null && (
         <Toast message={noticeText(notice.code)} onDismiss={store.dismissNotice} />
       )}
+      {/* TEST BOTS: delete this line and the TestBots function below to remove the bot button. */}
+      {snapshot !== null && exit === null && <TestBots gameKey={key} snapshot={snapshot} />}
     </ScreenEnvContext.Provider>
   );
 }
@@ -275,6 +277,28 @@ export function PhaseScreen(props: {
     }
   }
 }
+
+// ── TEST BOTS (step 10d) ── delete from here … ─────────────────────────────────────────────
+/**
+ * The 🤖 test-bot button + sheet: dev and staging builds only — like the galleries, production
+ * never loads (or even bundles) it. To hide it, see src/client/dev/bots/flag.ts.
+ */
+function TestBots(props: { gameKey: GameKey; snapshot: Snapshot }) {
+  const [Panel, setPanel] = useState<ComponentType<{
+    gameKey: GameKey;
+    snapshot: Snapshot;
+  }> | null>(null);
+  useEffect(() => {
+    if (import.meta.env.MODE !== 'production') {
+      void import('./dev/bots/BotPanel').then((module) => {
+        setPanel(() => module.BotPanel);
+      });
+    }
+  }, []);
+  if (Panel === null) return null;
+  return <Panel gameKey={props.gameKey} snapshot={props.snapshot} />;
+}
+// ── … to here (TEST BOTS) ──────────────────────────────────────────────────────────────────
 
 /** The dev galleries — dev and staging builds only (production drops this import entirely). */
 const DEV_PAGES = { devUi: 'ui', devScreens: 'screens', devRanking: 'ranking' } as const;
