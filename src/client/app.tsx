@@ -20,7 +20,7 @@ import {
   JoinProblemScreen,
   ReclaimScreen,
 } from './screens/StatusScreens';
-import { randomPreset, type Profile, type Storage } from './storage';
+import { randomPreset, type Profile } from './storage';
 import { appStorage, appStore } from './store/app';
 import { noticeText, STRINGS } from './strings';
 import { StatusStrip, Toast } from './ui/Feedback';
@@ -122,7 +122,6 @@ function Home(props: { profile: Profile; onEditProfile: () => void }) {
 
 function Game(props: { gameKey: GameKey; profile: Profile; onEditProfile: () => void }) {
   const store = appStore();
-  const storage = appStorage();
   const { gameKey: key, profile } = props;
   const open = store.gameKey.value;
   const started = useRef(false);
@@ -223,7 +222,7 @@ function Game(props: { gameKey: GameKey; profile: Profile; onEditProfile: () => 
         onHome={goHome}
       />
     );
-  else screen = <PhaseScreen snapshot={snapshot} onHome={goHome} storage={storage} />;
+  else screen = <PhaseScreen snapshot={snapshot} onHome={goHome} />;
 
   return (
     <ScreenEnvContext.Provider value={env}>
@@ -243,11 +242,7 @@ function Game(props: { gameKey: GameKey; profile: Profile; onEditProfile: () => 
 }
 
 /** The game screen for the snapshot's phase (a variant — no checks for fields a phase lacks). */
-export function PhaseScreen(props: {
-  snapshot: Snapshot;
-  onHome: () => void;
-  storage: Storage | null;
-}) {
+export function PhaseScreen(props: { snapshot: Snapshot; onHome: () => void }) {
   const { snapshot } = props;
   switch (snapshot.phase) {
     case 'LOBBY':
@@ -255,7 +250,6 @@ export function PhaseScreen(props: {
         <LobbyScreen
           snapshot={snapshot}
           joinUrl={`${location.origin}${gamePath(snapshot.key)}`}
-          storage={props.storage}
           inAppBrowser={isInAppBrowser(navigator.userAgent)}
         />
       );

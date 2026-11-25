@@ -36,6 +36,15 @@ describe('CSS Modules (typed-classes decision, 2026-11-24)', () => {
   });
 });
 
+describe('screen rules decided by the user', () => {
+  it('the theme picker (System / Light / Dark) is only on the Profile screen (2026-11-25)', () => {
+    const users = files(join(CLIENT, 'screens'), /\.tsx$/)
+      .filter((file) => /<ThemePicker\b/.test(read(file)))
+      .map(rel);
+    expect(users).toEqual(['src/client/screens/ProfileScreen.tsx']);
+  });
+});
+
 describe('layers: tokens → components → screens', () => {
   it('screens have no CSS files and import no CSS', () => {
     const screens = join(CLIENT, 'screens');

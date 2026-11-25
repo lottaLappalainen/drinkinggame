@@ -13,7 +13,7 @@ import { Row } from '../ui/Layout';
 import { Heading, Text } from '../ui/Text';
 import { useEnv, useNowUntil } from './env';
 
-/** System / Light / Dark (G-7) — on the Profile screen and in the lobby. */
+/** System / Light / Dark (G-7). Only on the Profile screen (user decision 2026-11-25), next to the name and picture. */
 export function ThemePicker(props: { storage: Storage | null }) {
   const choice = themeChoice.value;
   return (

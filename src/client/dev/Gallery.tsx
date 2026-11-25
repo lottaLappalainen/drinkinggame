@@ -378,7 +378,7 @@ function ScreenGallery() {
       {SCREEN_FIXTURES.map((fixture) => (
         <Frame key={fixture.name} name={fixture.name} screen={fixture.screen}>
           <ScreenEnvContext.Provider value={frozenEnv(fixture.now)}>
-            <PhaseScreen snapshot={fixture.snapshot} onHome={noop} storage={null} />
+            <PhaseScreen snapshot={fixture.snapshot} onHome={noop} />
           </ScreenEnvContext.Provider>
         </Frame>
       ))}

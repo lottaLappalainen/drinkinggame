@@ -5,7 +5,6 @@ import { GAME_LENGTHS, MIN_PLAYERS, PODIUM_MIN_PLAYERS } from '../../shared/cons
 import type { Settings, SnapshotOf } from '../../shared/protocol';
 import { ADD_ON_CATEGORY_IDS, categoryById } from '../../shared/questionCategories';
 import { GAME_MODES, type GameMode } from '../../shared/spots';
-import type { Storage } from '../storage';
 import { STRINGS } from '../strings';
 import { Button, SegmentedControl, Toggle } from '../ui/Controls';
 import { Banner, Card } from '../ui/Feedback';
@@ -14,19 +13,11 @@ import { Center, Row, Screen, Stack } from '../ui/Layout';
 import { QrCode } from '../ui/QrCode';
 import { Heading, Text } from '../ui/Text';
 import { useEnv } from './env';
-import {
-  LeaveButton,
-  photoSource,
-  ReclaimPrompts,
-  RemoveButton,
-  ThemePicker,
-  useCanRemove,
-} from './parts';
+import { LeaveButton, photoSource, ReclaimPrompts, RemoveButton, useCanRemove } from './parts';
 
 export function LobbyScreen(props: {
   snapshot: SnapshotOf<'LOBBY'>;
   joinUrl: string;
-  storage: Storage | null;
   inAppBrowser?: boolean;
 }) {
   const { snapshot } = props;
@@ -174,7 +165,6 @@ export function LobbyScreen(props: {
           </Button>
           <LeaveButton />
         </Row>
-        <ThemePicker storage={props.storage} />
       </Stack>
     </Screen>
   );
