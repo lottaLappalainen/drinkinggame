@@ -5,6 +5,8 @@ import { isInAppBrowser } from '../../src/client/device';
 import { parseRoute } from '../../src/client/router';
 import { noticeText, STRINGS } from '../../src/client/strings';
 import { ErrorCodeSchema } from '../../src/shared/protocol';
+import { readyListOrder } from '../../src/client/ui/readyOrder';
+import { P } from '../fixtures/common';
 
 describe('routes (G-17)', () => {
   it('/, /g/<KEY> (any case), the dev pages; anything else is Home', () => {
@@ -54,5 +56,20 @@ describe('strings (Q-5)', () => {
     collect(STRINGS);
     expect(texts.length).toBeGreaterThan(100);
     expect(texts.filter((text) => text.includes('—'))).toEqual([]);
+  });
+});
+
+describe('waiting list order (G-38)', () => {
+  it('who we are still waiting for comes first: answering, then offline, then ready', () => {
+    const [a, b, c, d, e] = [P.mikko, P.aino, P.ville, P.sanna, P.juho];
+    const online = new Set([a, b, c, e]);
+    // b and e are ready, d is offline; within a group the round's order stays.
+    expect(readyListOrder([a, b, c, d, e], new Set([b, e]), (id) => online.has(id))).toEqual([
+      a,
+      c,
+      d,
+      b,
+      e,
+    ]);
   });
 });

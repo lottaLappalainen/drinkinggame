@@ -17,6 +17,7 @@ import { questionParts } from '../../shared/questionSubject';
 import { readyCounter } from '../../shared/ready';
 import { STRINGS } from '../strings';
 import { Confetti } from './Confetti';
+import { readyListOrder } from './readyOrder';
 import { cx } from './cx';
 import { Badge } from './Feedback';
 import styles from './Game.module.css';
@@ -246,7 +247,11 @@ export function readyCountOf(
   return readyCounter(round.participants, new Set(round.ready), (id) => online.has(id));
 }
 
-/** Everyone taking part: ✓ Ready / Answering… / Offline — never what they answered. */
+/**
+ * Everyone taking part: Answering… / Offline / ✓ Ready — never what they answered. The ones still
+ * missing come first (user 2026-11-25: who are we waiting for?); a row that turns Ready slides down
+ * to the Ready group (PlayerList's FLIP). Ties keep the round's participant order.
+ */
 export function ReadyList(props: {
   participants: readonly PlayerId[];
   ready: readonly PlayerId[];
@@ -256,8 +261,11 @@ export function ReadyList(props: {
 }) {
   const byId = new Map(props.players.map((p) => [p.playerId, p]));
   const readySet = new Set(props.ready);
-  const rank = (id: PlayerId) => (readySet.has(id) ? 0 : byId.get(id)?.online === true ? 1 : 2);
-  const ordered = [...props.participants].sort((a, b) => rank(a) - rank(b));
+  const ordered = readyListOrder(
+    props.participants,
+    readySet,
+    (id) => byId.get(id)?.online === true,
+  );
   return (
     <PlayerList
       label={STRINGS.round.waitingTitle}
